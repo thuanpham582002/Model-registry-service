@@ -1,17 +1,23 @@
 package handler
 
 import (
-	"model-registry-service/internal/proxy"
+	"model-registry-service/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
-	proxy *proxy.Client
+	modelUC    *usecase.RegisteredModelUseCase
+	versionUC  *usecase.ModelVersionUseCase
+	artifactUC *usecase.ModelArtifactUseCase
 }
 
-func New(proxy *proxy.Client) *Handler {
-	return &Handler{proxy: proxy}
+func New(modelUC *usecase.RegisteredModelUseCase, versionUC *usecase.ModelVersionUseCase, artifactUC *usecase.ModelArtifactUseCase) *Handler {
+	return &Handler{
+		modelUC:    modelUC,
+		versionUC:  versionUC,
+		artifactUC: artifactUC,
+	}
 }
 
 func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {

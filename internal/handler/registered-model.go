@@ -1,76 +1,222 @@
 package handler
 
 import (
-	"fmt"
-	"io"
 	"net/http"
+	"strconv"
+
+	"model-registry-service/internal/domain"
+	"model-registry-service/internal/dto"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
 func (h *Handler) ListModels(c *gin.Context) {
-	upstreamPath := "/api/model_registry/v1alpha3/registered_models"
-	if q := c.Request.URL.RawQuery; q != "" {
-		upstreamPath += "?" + q
+	projectID, err := getProjectID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrMissingProjectID.Error()})
+		return
 	}
-	h.forwardAndRespond(c, http.MethodGet, upstreamPath)
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	filter := domain.ListFilter{
+		ProjectID: projectID,
+		State:     c.Query("state"),
+		ModelType: c.Query("model_type"),
+		Search:    c.Query("search"),
+		SortBy:    c.Query("sort_by"),
+		Order:     c.Query("order"),
+		Limit:     limit,
+		Offset:    offset,
+	}
+
+	models, total, err := h.modelUC.List(c.Request.Context(), filter)
+	if err != nil {
+		log.WithError(err).Error("list models failed")
+		mapDomainError(c, err)
+		return
+	}
+
+	items := make([]dto.RegisteredModelResponse, 0, len(models))
+	for _, m := range models {
+		items = append(items, dto.ToRegisteredModelResponse(m))
+	}
+
+	c.JSON(http.StatusOK, dto.ListRegisteredModelsResponse{
+		Items:      items,
+		Total:      total,
+		PageSize:   limit,
+		NextOffset: offset + len(items),
+	})
 }
 
 func (h *Handler) GetModel(c *gin.Context) {
-	id := c.Param("id")
-	upstreamPath := fmt.Sprintf("/api/model_registry/v1alpha3/registered_models/%s", id)
-	h.forwardAndRespond(c, http.MethodGet, upstreamPath)
+	projectID, err := getProjectID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrMissingProjectID.Error()})
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid model id"})
+		return
+	}
+
+	model, err := h.modelUC.Get(c.Request.Context(), projectID, id)
+	if err != nil {
+		mapDomainError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ToRegisteredModelResponse(model))
 }
 
 func (h *Handler) GetModelByParams(c *gin.Context) {
-	upstreamPath := "/api/model_registry/v1alpha3/registered_model"
-	if q := c.Request.URL.RawQuery; q != "" {
-		upstreamPath += "?" + q
+	projectID, err := getProjectID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrMissingProjectID.Error()})
+		return
 	}
-	h.forwardAndRespond(c, http.MethodGet, upstreamPath)
+
+	name := c.Query("name")
+	externalID := c.Query("externalId")
+
+	model, err := h.modelUC.GetByParams(c.Request.Context(), projectID, name, externalID)
+	if err != nil {
+		mapDomainError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ToRegisteredModelResponse(model))
 }
 
 func (h *Handler) CreateModel(c *gin.Context) {
-	upstreamPath := "/api/model_registry/v1alpha3/registered_models"
-	h.forwardAndRespond(c, http.MethodPost, upstreamPath)
-}
-
-func (h *Handler) UpdateModel(c *gin.Context) {
-	id := c.Param("id")
-	upstreamPath := fmt.Sprintf("/api/model_registry/v1alpha3/registered_models/%s", id)
-	h.forwardAndRespond(c, http.MethodPatch, upstreamPath)
-}
-
-func (h *Handler) DeleteModel(c *gin.Context) {
-	id := c.Param("id")
-	upstreamPath := fmt.Sprintf("/api/model_registry/v1alpha3/registered_models/%s", id)
-	h.forwardAndRespond(c, http.MethodDelete, upstreamPath)
-}
-
-// forwardAndRespond proxies the request to upstream and writes the response back.
-func (h *Handler) forwardAndRespond(c *gin.Context, method, upstreamPath string) {
-	resp, err := h.proxy.Forward(method, upstreamPath, c.Request.Body, c.Request.Header)
+	projectID, err := getProjectID(c)
 	if err != nil {
-		log.WithError(err).Error("upstream request failed")
-		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream request failed"})
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.WithError(err).Error("read upstream response")
-		c.JSON(http.StatusBadGateway, gin.H{"error": "read upstream response failed"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrMissingProjectID.Error()})
 		return
 	}
 
-	// Copy upstream response headers
-	for key, values := range resp.Header {
-		for _, v := range values {
-			c.Header(key, v)
+	var req dto.CreateRegisteredModelRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	tags := domain.Tags{}
+	if req.Tags != nil {
+		tags = domain.Tags{
+			Frameworks:    req.Tags.Frameworks,
+			Architectures: req.Tags.Architectures,
+			Tasks:         req.Tags.Tasks,
+			Subjects:      req.Tags.Subjects,
 		}
 	}
 
-	c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
+	model, err := h.modelUC.Create(
+		c.Request.Context(), projectID, nil,
+		req.Name, req.Description, req.RegionID,
+		req.ModelType, tags, req.Labels, req.ParentModelID,
+	)
+	if err != nil {
+		log.WithError(err).Error("create model failed")
+		mapDomainError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, dto.ToRegisteredModelResponse(model))
+}
+
+func (h *Handler) UpdateModel(c *gin.Context) {
+	projectID, err := getProjectID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrMissingProjectID.Error()})
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid model id"})
+		return
+	}
+
+	var req dto.UpdateRegisteredModelRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updates := make(map[string]interface{})
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if req.Description != nil {
+		updates["description"] = *req.Description
+	}
+	if req.ModelType != nil {
+		updates["model_type"] = *req.ModelType
+	}
+	if req.ModelSize != nil {
+		updates["model_size"] = *req.ModelSize
+	}
+	if req.State != nil {
+		updates["state"] = *req.State
+	}
+	if req.DeploymentStatus != nil {
+		updates["deployment_status"] = *req.DeploymentStatus
+	}
+	if req.Tags != nil {
+		updates["tags"] = domain.Tags{
+			Frameworks:    req.Tags.Frameworks,
+			Architectures: req.Tags.Architectures,
+			Tasks:         req.Tags.Tasks,
+			Subjects:      req.Tags.Subjects,
+		}
+	}
+	if req.Labels != nil {
+		updates["labels"] = req.Labels
+	}
+
+	model, err := h.modelUC.Update(c.Request.Context(), projectID, id, updates)
+	if err != nil {
+		log.WithError(err).Error("update model failed")
+		mapDomainError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ToRegisteredModelResponse(model))
+}
+
+func (h *Handler) DeleteModel(c *gin.Context) {
+	projectID, err := getProjectID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrMissingProjectID.Error()})
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid model id"})
+		return
+	}
+
+	if err := h.modelUC.Delete(c.Request.Context(), projectID, id); err != nil {
+		log.WithError(err).Error("delete model failed")
+		mapDomainError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
+}
+
+func getProjectID(c *gin.Context) (uuid.UUID, error) {
+	header := c.GetHeader("X-Project-ID")
+	if header == "" {
+		return uuid.Nil, domain.ErrMissingProjectID
+	}
+	return uuid.Parse(header)
 }

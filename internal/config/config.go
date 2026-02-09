@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/viper"
@@ -8,7 +9,7 @@ import (
 
 type Config struct {
 	Server   ServerConfig
-	Upstream UpstreamConfig
+	Database DatabaseConfig
 	Logger   LoggerConfig
 }
 
@@ -17,9 +18,23 @@ type ServerConfig struct {
 	Port int
 }
 
-type UpstreamConfig struct {
-	URL     string
-	Timeout time.Duration
+type DatabaseConfig struct {
+	Host            string
+	Port            int
+	User            string
+	Password        string
+	DBName          string
+	SSLMode         string
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+}
+
+func (d DatabaseConfig) DSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		d.Host, d.Port, d.User, d.Password, d.DBName, d.SSLMode,
+	)
 }
 
 type LoggerConfig struct {
@@ -33,17 +48,23 @@ func Load() (*Config, error) {
 	// Defaults
 	v.SetDefault("SERVER_HOST", "0.0.0.0")
 	v.SetDefault("SERVER_PORT", 8080)
-	v.SetDefault("UPSTREAM_URL", "http://localhost:8085")
-	v.SetDefault("UPSTREAM_TIMEOUT", "30s")
+	v.SetDefault("DATABASE_HOST", "localhost")
+	v.SetDefault("DATABASE_PORT", 5432)
+	v.SetDefault("DATABASE_USER", "postgres")
+	v.SetDefault("DATABASE_PASSWORD", "postgres")
+	v.SetDefault("DATABASE_DBNAME", "cmp")
+	v.SetDefault("DATABASE_SSLMODE", "disable")
+	v.SetDefault("DATABASE_MAX_OPEN_CONNS", 25)
+	v.SetDefault("DATABASE_MAX_IDLE_CONNS", 5)
+	v.SetDefault("DATABASE_CONN_MAX_LIFETIME", "5m")
 	v.SetDefault("LOGGER_LEVEL", "info")
 	v.SetDefault("LOGGER_FORMAT", "json")
 
-	// Env
 	v.AutomaticEnv()
 
-	timeout, err := time.ParseDuration(v.GetString("UPSTREAM_TIMEOUT"))
+	connMaxLifetime, err := time.ParseDuration(v.GetString("DATABASE_CONN_MAX_LIFETIME"))
 	if err != nil {
-		timeout = 30 * time.Second
+		connMaxLifetime = 5 * time.Minute
 	}
 
 	cfg := &Config{
@@ -51,9 +72,16 @@ func Load() (*Config, error) {
 			Host: v.GetString("SERVER_HOST"),
 			Port: v.GetInt("SERVER_PORT"),
 		},
-		Upstream: UpstreamConfig{
-			URL:     v.GetString("UPSTREAM_URL"),
-			Timeout: timeout,
+		Database: DatabaseConfig{
+			Host:            v.GetString("DATABASE_HOST"),
+			Port:            v.GetInt("DATABASE_PORT"),
+			User:            v.GetString("DATABASE_USER"),
+			Password:        v.GetString("DATABASE_PASSWORD"),
+			DBName:          v.GetString("DATABASE_DBNAME"),
+			SSLMode:         v.GetString("DATABASE_SSLMODE"),
+			MaxOpenConns:    v.GetInt("DATABASE_MAX_OPEN_CONNS"),
+			MaxIdleConns:    v.GetInt("DATABASE_MAX_IDLE_CONNS"),
+			ConnMaxLifetime: connMaxLifetime,
 		},
 		Logger: LoggerConfig{
 			Level:  v.GetString("LOGGER_LEVEL"),

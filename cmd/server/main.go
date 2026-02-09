@@ -12,27 +12,51 @@ import (
 	"model-registry-service/internal/config"
 	"model-registry-service/internal/handler"
 	"model-registry-service/internal/middleware"
-	"model-registry-service/internal/proxy"
+	"model-registry-service/internal/repository"
+	"model-registry-service/internal/usecase"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	// Load config
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
 
-	// Init logger
 	initLogger(cfg)
 
-	// Create proxy client
-	proxyClient := proxy.NewClient(cfg.Upstream.URL, cfg.Upstream.Timeout)
+	// Create database pool
+	poolCfg, err := pgxpool.ParseConfig(cfg.Database.DSN())
+	if err != nil {
+		log.Fatalf("parse db config: %v", err)
+	}
+	poolCfg.MaxConns = int32(cfg.Database.MaxOpenConns)
+	poolCfg.MinConns = int32(cfg.Database.MaxIdleConns)
+	poolCfg.MaxConnLifetime = cfg.Database.ConnMaxLifetime
 
-	// Create handler
-	h := handler.New(proxyClient)
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
+	if err != nil {
+		log.Fatalf("create db pool: %v", err)
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(context.Background()); err != nil {
+		log.Fatalf("ping db: %v", err)
+	}
+	log.Info("database connection established")
+
+	// Create layers
+	modelRepo := repository.NewRegisteredModelRepository(pool)
+	versionRepo := repository.NewModelVersionRepository(pool)
+
+	modelUC := usecase.NewRegisteredModelUseCase(modelRepo)
+	versionUC := usecase.NewModelVersionUseCase(versionRepo, modelRepo)
+	artifactUC := usecase.NewModelArtifactUseCase(versionRepo, modelRepo)
+
+	h := handler.New(modelUC, versionUC, artifactUC)
 
 	// Setup router
 	router := gin.New()
@@ -41,8 +65,12 @@ func main() {
 	api := router.Group("/api/v1/model-registry")
 	h.RegisterRoutes(api)
 
-	// Health check
+	// Health check with DB ping
 	router.GET("/healthz", func(c *gin.Context) {
+		if err := pool.Ping(c.Request.Context()); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy", "error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
