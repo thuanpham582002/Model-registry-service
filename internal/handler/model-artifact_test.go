@@ -48,7 +48,7 @@ func TestGetModelArtifact(t *testing.T) {
 	versionRepo.On("GetByID", mock.Anything, projectID, id).Return(version, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/model_artifacts/"+id.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -65,7 +65,7 @@ func TestListModelArtifacts(t *testing.T) {
 	versionRepo.On("List", mock.Anything, mock.AnythingOfType("domain.VersionListFilter")).Return(versions, 1, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/model_artifacts", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -98,7 +98,7 @@ func TestCreateModelArtifact(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/model-registry/model_artifacts", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -122,7 +122,7 @@ func TestUpdateModelArtifact(t *testing.T) {
 	body, _ := json.Marshal(map[string]interface{}{"artifact_type": "doc-artifact"})
 	req, _ := http.NewRequest("PATCH", "/api/v1/model-registry/model_artifacts/"+id.String(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -141,7 +141,7 @@ func TestFindModelArtifact(t *testing.T) {
 	versionRepo.On("FindByParams", mock.Anything, projectID, "v1", "", (*uuid.UUID)(nil)).Return(version, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/model_artifact?name=v1", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

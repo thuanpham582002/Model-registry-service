@@ -36,7 +36,7 @@ func TestModelVersionUseCase_Create(t *testing.T) {
 
 	version, err := uc.Create(context.Background(), projectID, modelID, "v1", "desc", false,
 		"model-artifact", "pytorch", "2.0", "", "", "s3://bucket/model", "", "",
-		nil, nil, nil)
+		nil, nil, nil, "creator@test.com", "")
 	assert.NoError(t, err)
 	assert.Equal(t, "v1", version.Name)
 }
@@ -52,7 +52,7 @@ func TestModelVersionUseCase_Create_ModelNotFound(t *testing.T) {
 
 	_, err := uc.Create(context.Background(), projectID, modelID, "v1", "desc", false,
 		"", "pytorch", "2.0", "", "", "s3://bucket/model", "", "",
-		nil, nil, nil)
+		nil, nil, nil, "", "")
 	assert.ErrorIs(t, err, domain.ErrModelNotFound)
 }
 

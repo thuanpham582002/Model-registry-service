@@ -44,7 +44,6 @@ type RegisteredModel struct {
 	Name             string           `json:"name"`
 	Slug             string           `json:"slug"`
 	Description      string           `json:"description"`
-	RegionID         uuid.UUID        `json:"region_id"`
 	ModelType        ModelType        `json:"model_type"`
 	ModelSize        int64            `json:"model_size"`
 	State            ModelState       `json:"state"`
@@ -55,7 +54,6 @@ type RegisteredModel struct {
 
 	// Computed fields (populated by repository)
 	OwnerEmail     string        `json:"owner_email,omitempty"`
-	RegionName     string        `json:"region_name,omitempty"`
 	VersionCount   int           `json:"version_count"`
 	LatestVersion  *ModelVersion `json:"latest_version,omitempty"`
 	DefaultVersion *ModelVersion `json:"default_version,omitempty"`

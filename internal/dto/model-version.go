@@ -18,6 +18,8 @@ type CreateModelVersionRequest struct {
 	SecretKey             string            `json:"secret_key"`
 	Labels                map[string]string `json:"labels"`
 	PrebuiltContainerID   *uuid.UUID        `json:"prebuilt_container_id"`
+	CreatedByEmail        string            `json:"created_by_email"`
+	UpdatedByEmail        string            `json:"updated_by_email"`
 }
 
 type UpdateModelVersionRequest struct {

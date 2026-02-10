@@ -34,17 +34,17 @@ func (r *registeredModelRepo) Create(ctx context.Context, model *domain.Register
 	}
 
 	query := `
-		INSERT INTO model_registry_registered_model
-			(id, created_at, updated_at, project_id, owner_id, name, slug,
-			 description, region_id, model_type, model_size, state,
+		INSERT INTO registered_model
+			(id, created_at, updated_at, project_id, owner_id, owner_email, name, slug,
+			 description, model_type, model_size, state,
 			 deployment_status, tags, labels, parent_model_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
 	`
 
 	_, err = r.pool.Exec(ctx, query,
 		model.ID, model.CreatedAt, model.UpdatedAt,
-		model.ProjectID, model.OwnerID, model.Name, model.Slug,
-		model.Description, model.RegionID, string(model.ModelType),
+		model.ProjectID, model.OwnerID, model.OwnerEmail, model.Name, model.Slug,
+		model.Description, string(model.ModelType),
 		model.ModelSize, string(model.State), string(model.DeploymentStatus),
 		tagsJSON, labelsJSON, model.ParentModelID,
 	)
@@ -62,15 +62,12 @@ func (r *registeredModelRepo) GetByID(ctx context.Context, projectID uuid.UUID, 
 	query := `
 		SELECT
 			rm.id, rm.created_at, rm.updated_at, rm.project_id, rm.owner_id,
-			rm.name, rm.slug, rm.description, rm.region_id,
+			rm.name, rm.slug, rm.description,
 			rm.model_type, rm.model_size, rm.state, rm.deployment_status,
 			rm.tags, rm.labels, rm.parent_model_id,
-			COALESCE(tu.email, '') AS owner_email,
-			COALESCE(oreg.name, '') AS region_name,
-			(SELECT COUNT(*) FROM model_registry_model_version mv WHERE mv.registered_model_id = rm.id) AS version_count
-		FROM model_registry_registered_model rm
-		LEFT JOIN tenant_user tu ON tu.id = rm.owner_id
-		LEFT JOIN organization_region oreg ON oreg.id = rm.region_id
+			COALESCE(rm.owner_email, '') AS owner_email,
+			(SELECT COUNT(*) FROM model_version mv WHERE mv.registered_model_id = rm.id) AS version_count
+		FROM registered_model rm
 		WHERE rm.id = $1 AND rm.project_id = $2
 	`
 
@@ -112,15 +109,12 @@ func (r *registeredModelRepo) GetByParams(ctx context.Context, projectID uuid.UU
 	query := fmt.Sprintf(`
 		SELECT
 			rm.id, rm.created_at, rm.updated_at, rm.project_id, rm.owner_id,
-			rm.name, rm.slug, rm.description, rm.region_id,
+			rm.name, rm.slug, rm.description,
 			rm.model_type, rm.model_size, rm.state, rm.deployment_status,
 			rm.tags, rm.labels, rm.parent_model_id,
-			COALESCE(tu.email, '') AS owner_email,
-			COALESCE(oreg.name, '') AS region_name,
-			(SELECT COUNT(*) FROM model_registry_model_version mv WHERE mv.registered_model_id = rm.id) AS version_count
-		FROM model_registry_registered_model rm
-		LEFT JOIN tenant_user tu ON tu.id = rm.owner_id
-		LEFT JOIN organization_region oreg ON oreg.id = rm.region_id
+			COALESCE(rm.owner_email, '') AS owner_email,
+			(SELECT COUNT(*) FROM model_version mv WHERE mv.registered_model_id = rm.id) AS version_count
+		FROM registered_model rm
 		WHERE %s
 		LIMIT 1
 	`, strings.Join(conditions, " AND "))
@@ -151,7 +145,7 @@ func (r *registeredModelRepo) Update(ctx context.Context, projectID uuid.UUID, m
 	}
 
 	query := `
-		UPDATE model_registry_registered_model
+		UPDATE registered_model
 		SET name=$1, description=$2, model_type=$3, model_size=$4,
 			state=$5, deployment_status=$6, tags=$7, labels=$8, updated_at=NOW()
 		WHERE id=$9 AND project_id=$10
@@ -175,7 +169,7 @@ func (r *registeredModelRepo) Update(ctx context.Context, projectID uuid.UUID, m
 }
 
 func (r *registeredModelRepo) Delete(ctx context.Context, projectID uuid.UUID, id uuid.UUID) error {
-	query := `DELETE FROM model_registry_registered_model WHERE id = $1 AND project_id = $2`
+	query := `DELETE FROM registered_model WHERE id = $1 AND project_id = $2`
 	result, err := r.pool.Exec(ctx, query, id, projectID)
 	if err != nil {
 		return fmt.Errorf("delete registered model: %w", err)
@@ -210,7 +204,7 @@ func (r *registeredModelRepo) List(ctx context.Context, filter domain.ListFilter
 	whereClause := strings.Join(conditions, " AND ")
 
 	// Count
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM model_registry_registered_model rm WHERE %s", whereClause)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM registered_model rm WHERE %s", whereClause)
 	var total int
 	if err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count registered models: %w", err)
@@ -229,15 +223,12 @@ func (r *registeredModelRepo) List(ctx context.Context, filter domain.ListFilter
 	query := fmt.Sprintf(`
 		SELECT
 			rm.id, rm.created_at, rm.updated_at, rm.project_id, rm.owner_id,
-			rm.name, rm.slug, rm.description, rm.region_id,
+			rm.name, rm.slug, rm.description,
 			rm.model_type, rm.model_size, rm.state, rm.deployment_status,
 			rm.tags, rm.labels, rm.parent_model_id,
-			COALESCE(tu.email, '') AS owner_email,
-			COALESCE(oreg.name, '') AS region_name,
-			(SELECT COUNT(*) FROM model_registry_model_version mv WHERE mv.registered_model_id = rm.id) AS version_count
-		FROM model_registry_registered_model rm
-		LEFT JOIN tenant_user tu ON tu.id = rm.owner_id
-		LEFT JOIN organization_region oreg ON oreg.id = rm.region_id
+			COALESCE(rm.owner_email, '') AS owner_email,
+			(SELECT COUNT(*) FROM model_version mv WHERE mv.registered_model_id = rm.id) AS version_count
+		FROM registered_model rm
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
@@ -273,10 +264,10 @@ func (r *registeredModelRepo) scanModel(row pgx.Row) (*domain.RegisteredModel, e
 
 	err := row.Scan(
 		&m.ID, &m.CreatedAt, &m.UpdatedAt, &m.ProjectID, &m.OwnerID,
-		&m.Name, &m.Slug, &m.Description, &m.RegionID,
+		&m.Name, &m.Slug, &m.Description,
 		&m.ModelType, &m.ModelSize, &m.State, &m.DeploymentStatus,
 		&tagsJSON, &labelsJSON, &m.ParentModelID,
-		&m.OwnerEmail, &m.RegionName, &m.VersionCount,
+		&m.OwnerEmail, &m.VersionCount,
 	)
 	if err != nil {
 		return nil, err
@@ -301,10 +292,10 @@ func (r *registeredModelRepo) scanModelFromRows(rows pgx.Rows) (*domain.Register
 
 	err := rows.Scan(
 		&m.ID, &m.CreatedAt, &m.UpdatedAt, &m.ProjectID, &m.OwnerID,
-		&m.Name, &m.Slug, &m.Description, &m.RegionID,
+		&m.Name, &m.Slug, &m.Description,
 		&m.ModelType, &m.ModelSize, &m.State, &m.DeploymentStatus,
 		&tagsJSON, &labelsJSON, &m.ParentModelID,
-		&m.OwnerEmail, &m.RegionName, &m.VersionCount,
+		&m.OwnerEmail, &m.VersionCount,
 	)
 	if err != nil {
 		return nil, err
@@ -330,7 +321,7 @@ func (r *registeredModelRepo) loadVersionMeta(ctx context.Context, model *domain
 			   artifact_type, model_framework, model_framework_version,
 			   container_image, model_catalog_name, uri, access_key, secret_key,
 			   labels, prebuilt_container_id
-		FROM model_registry_model_version
+		FROM model_version
 		WHERE registered_model_id = $1
 		ORDER BY created_at DESC
 		LIMIT 1
@@ -349,7 +340,7 @@ func (r *registeredModelRepo) loadVersionMeta(ctx context.Context, model *domain
 			   artifact_type, model_framework, model_framework_version,
 			   container_image, model_catalog_name, uri, access_key, secret_key,
 			   labels, prebuilt_container_id
-		FROM model_registry_model_version
+		FROM model_version
 		WHERE registered_model_id = $1 AND is_default = true
 		LIMIT 1
 	`

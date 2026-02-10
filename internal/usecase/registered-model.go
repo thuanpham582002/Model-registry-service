@@ -17,7 +17,7 @@ func NewRegisteredModelUseCase(repo domain.RegisteredModelRepository) *Registere
 	return &RegisteredModelUseCase{repo: repo}
 }
 
-func (uc *RegisteredModelUseCase) Create(ctx context.Context, projectID uuid.UUID, ownerID *uuid.UUID, name, description string, regionID uuid.UUID, modelType string, tags domain.Tags, labels map[string]string, parentModelID *uuid.UUID) (*domain.RegisteredModel, error) {
+func (uc *RegisteredModelUseCase) Create(ctx context.Context, projectID uuid.UUID, ownerID *uuid.UUID, name, description string, ownerEmail, modelType string, tags domain.Tags, labels map[string]string, parentModelID *uuid.UUID) (*domain.RegisteredModel, error) {
 	if name == "" {
 		return nil, domain.ErrInvalidModelName
 	}
@@ -34,10 +34,10 @@ func (uc *RegisteredModelUseCase) Create(ctx context.Context, projectID uuid.UUI
 		UpdatedAt:        now,
 		ProjectID:        projectID,
 		OwnerID:          ownerID,
+		OwnerEmail:       ownerEmail,
 		Name:             name,
 		Slug:             generateSlug(name),
 		Description:      description,
-		RegionID:         regionID,
 		ModelType:        mt,
 		State:            domain.ModelStateLive,
 		DeploymentStatus: domain.DeploymentStatusUndeployed,

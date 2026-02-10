@@ -18,8 +18,6 @@ func ToRegisteredModelResponse(m *domain.RegisteredModel) RegisteredModelRespons
 		Name:             m.Name,
 		Slug:             m.Slug,
 		Description:      m.Description,
-		RegionID:         m.RegionID,
-		RegionName:       m.RegionName,
 		ModelType:        string(m.ModelType),
 		ModelSize:        m.ModelSize,
 		State:            string(m.State),

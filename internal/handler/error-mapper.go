@@ -22,7 +22,6 @@ func mapDomainError(c *gin.Context, err error) {
 
 	case errors.Is(err, domain.ErrInvalidModelName),
 		errors.Is(err, domain.ErrMissingProjectID),
-		errors.Is(err, domain.ErrMissingRegionID),
 		errors.Is(err, domain.ErrCannotDeleteModel):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 

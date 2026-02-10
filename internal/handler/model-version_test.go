@@ -52,7 +52,7 @@ func TestListModelVersions(t *testing.T) {
 	versionRepo.On("ListByModel", mock.Anything, modelID, mock.AnythingOfType("domain.VersionListFilter")).Return(versions, 1, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models/"+modelID.String()+"/versions", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -79,7 +79,7 @@ func TestGetModelVersion(t *testing.T) {
 	versionRepo.On("GetByModelAndVersion", mock.Anything, projectID, modelID, versionID).Return(version, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models/"+modelID.String()+"/versions/"+versionID.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -112,7 +112,7 @@ func TestCreateModelVersion(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/model-registry/models/"+modelID.String()+"/versions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -134,7 +134,7 @@ func TestGetModelVersionDirect(t *testing.T) {
 	versionRepo.On("GetByID", mock.Anything, projectID, id).Return(version, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/model_versions/"+id.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -159,7 +159,7 @@ func TestUpdateModelVersionDirect(t *testing.T) {
 	body, _ := json.Marshal(map[string]interface{}{"status": "READY"})
 	req, _ := http.NewRequest("PATCH", "/api/v1/model-registry/model_versions/"+id.String(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -176,7 +176,7 @@ func TestListAllModelVersions(t *testing.T) {
 	versionRepo.On("List", mock.Anything, mock.AnythingOfType("domain.VersionListFilter")).Return(versions, 1, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/model_versions", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -196,7 +196,7 @@ func TestFindModelVersion(t *testing.T) {
 	versionRepo.On("FindByParams", mock.Anything, projectID, "v1", "", (*uuid.UUID)(nil)).Return(version, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/model_version?name=v1", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

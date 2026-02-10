@@ -18,7 +18,7 @@ func NewModelVersionUseCase(repo domain.ModelVersionRepository, modelRepo domain
 	return &ModelVersionUseCase{repo: repo, modelRepo: modelRepo}
 }
 
-func (uc *ModelVersionUseCase) Create(ctx context.Context, projectID uuid.UUID, modelID uuid.UUID, name, description string, isDefault bool, artifactType, framework, frameworkVersion, containerImage, catalogName, uri, accessKey, secretKey string, labels map[string]string, prebuiltContainerID *uuid.UUID, createdByID *uuid.UUID) (*domain.ModelVersion, error) {
+func (uc *ModelVersionUseCase) Create(ctx context.Context, projectID uuid.UUID, modelID uuid.UUID, name, description string, isDefault bool, artifactType, framework, frameworkVersion, containerImage, catalogName, uri, accessKey, secretKey string, labels map[string]string, prebuiltContainerID *uuid.UUID, createdByID *uuid.UUID, createdByEmail, updatedByEmail string) (*domain.ModelVersion, error) {
 	// Verify parent model exists AND belongs to this project
 	if _, err := uc.modelRepo.GetByID(ctx, projectID, modelID); err != nil {
 		return nil, err
@@ -46,6 +46,8 @@ func (uc *ModelVersionUseCase) Create(ctx context.Context, projectID uuid.UUID, 
 		Status:                domain.VersionStatusPending,
 		CreatedByID:           createdByID,
 		UpdatedByID:           createdByID,
+		CreatedByEmail:        createdByEmail,
+		UpdatedByEmail:        updatedByEmail,
 		ArtifactType:          at,
 		ModelFramework:        framework,
 		ModelFrameworkVersion: frameworkVersion,

@@ -52,7 +52,7 @@ func Load() (*Config, error) {
 	v.SetDefault("DATABASE_PORT", 5432)
 	v.SetDefault("DATABASE_USER", "postgres")
 	v.SetDefault("DATABASE_PASSWORD", "postgres")
-	v.SetDefault("DATABASE_DBNAME", "cmp")
+	v.SetDefault("DATABASE_DBNAME", "model_registry")
 	v.SetDefault("DATABASE_SSLMODE", "disable")
 	v.SetDefault("DATABASE_MAX_OPEN_CONNS", 25)
 	v.SetDefault("DATABASE_MAX_IDLE_CONNS", 5)

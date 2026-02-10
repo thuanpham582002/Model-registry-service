@@ -9,7 +9,6 @@ var (
 	ErrVersionNameConflict = errors.New("version with this name already exists for this model")
 	ErrArtifactNotFound    = errors.New("model artifact not found")
 	ErrInvalidModelName    = errors.New("model name is required")
-	ErrMissingProjectID    = errors.New("project ID is required (X-Project-ID header)")
-	ErrMissingRegionID     = errors.New("region ID is required")
+	ErrMissingProjectID    = errors.New("project ID is required (Project-ID header)")
 	ErrCannotDeleteModel   = errors.New("cannot delete model: must be archived with no READY versions")
 )

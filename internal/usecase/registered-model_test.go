@@ -39,7 +39,7 @@ func TestRegisteredModelUseCase_Create(t *testing.T) {
 	repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.RegisteredModel")).Return(nil)
 	repo.On("GetByID", mock.Anything, projectID, mock.AnythingOfType("uuid.UUID")).Return(returnedModel, nil)
 
-	model, err := uc.Create(context.Background(), projectID, nil, "test-model", "desc", regionID, "", domain.Tags{}, nil, nil)
+	model, err := uc.Create(context.Background(), projectID, nil, "test-model", "desc", regionID, "region1", "owner@test.com", "", domain.Tags{}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "test-model", model.Name)
 	repo.AssertExpectations(t)
@@ -49,7 +49,7 @@ func TestRegisteredModelUseCase_Create_EmptyName(t *testing.T) {
 	repo := new(testutil.MockRegisteredModelRepo)
 	uc := NewRegisteredModelUseCase(repo)
 
-	_, err := uc.Create(context.Background(), uuid.New(), nil, "", "desc", uuid.New(), "", domain.Tags{}, nil, nil)
+	_, err := uc.Create(context.Background(), uuid.New(), nil, "", "desc", uuid.New(), "", "", "", domain.Tags{}, nil, nil)
 	assert.ErrorIs(t, err, domain.ErrInvalidModelName)
 }
 
@@ -59,7 +59,7 @@ func TestRegisteredModelUseCase_Create_NameConflict(t *testing.T) {
 
 	repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.RegisteredModel")).Return(domain.ErrModelNameConflict)
 
-	_, err := uc.Create(context.Background(), uuid.New(), nil, "dup", "desc", uuid.New(), "", domain.Tags{}, nil, nil)
+	_, err := uc.Create(context.Background(), uuid.New(), nil, "dup", "desc", uuid.New(), "", "", "", domain.Tags{}, nil, nil)
 	assert.ErrorIs(t, err, domain.ErrModelNameConflict)
 }
 

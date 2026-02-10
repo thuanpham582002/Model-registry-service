@@ -244,7 +244,7 @@ func TestE2E_CreateModel(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/model-registry/models", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -269,7 +269,7 @@ func TestE2E_GetModel(t *testing.T) {
 	modelRepo.On("GetByID", mock.Anything, projectID, model.ID).Return(model, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models/"+model.ID.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -291,7 +291,7 @@ func TestE2E_ListModels(t *testing.T) {
 	modelRepo.On("List", mock.Anything, mock.AnythingOfType("domain.ListFilter")).Return(models, 1, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models?limit=10&offset=0", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -319,7 +319,7 @@ func TestE2E_FindModel(t *testing.T) {
 	modelRepo.On("GetByParams", mock.Anything, projectID, "test-model", "").Return(model, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/model?name=test-model", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -354,7 +354,7 @@ func TestE2E_UpdateModel(t *testing.T) {
 
 	req, _ := http.NewRequest("PATCH", "/api/v1/model-registry/models/"+existing.ID.String(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -376,7 +376,7 @@ func TestE2E_DeleteModel(t *testing.T) {
 	modelRepo.On("Delete", mock.Anything, projectID, id).Return(nil)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/model-registry/models/"+id.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -413,7 +413,7 @@ func TestE2E_CreateVersion(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/model-registry/models/"+modelID.String()+"/versions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -438,7 +438,7 @@ func TestE2E_GetVersion(t *testing.T) {
 	versionRepo.On("GetByModelAndVersion", mock.Anything, projectID, modelID, version.ID).Return(version, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models/"+modelID.String()+"/versions/"+version.ID.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -460,7 +460,7 @@ func TestE2E_ListVersions(t *testing.T) {
 	versionRepo.On("ListByModel", mock.Anything, modelID, mock.AnythingOfType("domain.VersionListFilter")).Return(versions, 1, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models/"+modelID.String()+"/versions?limit=10", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -495,7 +495,7 @@ func TestE2E_UpdateVersion(t *testing.T) {
 
 	req, _ := http.NewRequest("PATCH", "/api/v1/model-registry/models/"+modelID.String()+"/versions/"+existing.ID.String(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -534,7 +534,7 @@ func TestE2E_CreateArtifact(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/model-registry/model_artifacts", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -558,7 +558,7 @@ func TestE2E_GetArtifact(t *testing.T) {
 	versionRepo.On("GetByID", mock.Anything, projectID, version.ID).Return(version, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/model_artifacts/"+version.ID.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -591,7 +591,7 @@ func TestE2E_UpdateArtifact(t *testing.T) {
 
 	req, _ := http.NewRequest("PATCH", "/api/v1/model-registry/model_artifacts/"+existing.ID.String(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

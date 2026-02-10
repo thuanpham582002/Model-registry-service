@@ -52,7 +52,7 @@ func TestListModels(t *testing.T) {
 	modelRepo.On("List", mock.Anything, mock.AnythingOfType("domain.ListFilter")).Return(models, 1, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models?limit=10&offset=0", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -89,7 +89,7 @@ func TestGetModel(t *testing.T) {
 	modelRepo.On("GetByID", mock.Anything, projectID, id).Return(model, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models/"+id.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -104,7 +104,7 @@ func TestGetModel_NotFound(t *testing.T) {
 	modelRepo.On("GetByID", mock.Anything, projectID, id).Return(nil, domain.ErrModelNotFound)
 
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models/"+id.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -116,7 +116,7 @@ func TestGetModel_InvalidID(t *testing.T) {
 
 	projectID := uuid.New()
 	req, _ := http.NewRequest("GET", "/api/v1/model-registry/models/not-a-uuid", nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -147,7 +147,7 @@ func TestCreateModel(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/model-registry/models", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -164,7 +164,7 @@ func TestCreateModel_MissingName(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/model-registry/models", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -191,7 +191,7 @@ func TestUpdateModel(t *testing.T) {
 	body, _ := json.Marshal(map[string]interface{}{"name": "updated"})
 	req, _ := http.NewRequest("PATCH", "/api/v1/model-registry/models/"+id.String(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -208,7 +208,7 @@ func TestDeleteModel(t *testing.T) {
 	modelRepo.On("Delete", mock.Anything, projectID, id).Return(nil)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/model-registry/models/"+id.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -224,7 +224,7 @@ func TestDeleteModel_NotArchived(t *testing.T) {
 	modelRepo.On("GetByID", mock.Anything, projectID, id).Return(existing, nil)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/model-registry/models/"+id.String(), nil)
-	req.Header.Set("X-Project-ID", projectID.String())
+	req.Header.Set("Project-ID", projectID.String())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

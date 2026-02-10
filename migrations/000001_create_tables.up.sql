@@ -1,4 +1,4 @@
--- Model Registry Service - Schema with denormalized columns
+-- Model Registry Service - Initial Schema
 -- SYNC pattern: Go MR stores owner_email, region_name locally (no JOINs to CMP)
 
 -- Core tables
@@ -63,23 +63,25 @@ CREATE TABLE IF NOT EXISTS model_version (
 );
 
 -- Indexes for registered_model
-CREATE INDEX IF NOT EXISTS idx_registered_model_project_id ON registered_model(project_id);
-CREATE INDEX IF NOT EXISTS idx_registered_model_region_id ON registered_model(region_id);
-CREATE INDEX IF NOT EXISTS idx_registered_model_owner_id ON registered_model(owner_id);
-CREATE INDEX IF NOT EXISTS idx_registered_model_state ON registered_model(state);
-CREATE INDEX IF NOT EXISTS idx_registered_model_created_at ON registered_model(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_registered_model_name ON registered_model(name);
+CREATE INDEX idx_registered_model_project_id ON registered_model(project_id);
+CREATE INDEX idx_registered_model_region_id ON registered_model(region_id);
+CREATE INDEX idx_registered_model_owner_id ON registered_model(owner_id);
+CREATE INDEX idx_registered_model_state ON registered_model(state);
+CREATE INDEX idx_registered_model_created_at ON registered_model(created_at DESC);
+CREATE INDEX idx_registered_model_name ON registered_model(name);
 
 -- Indexes for model_version
-CREATE INDEX IF NOT EXISTS idx_model_version_registered_model_id ON model_version(registered_model_id);
-CREATE INDEX IF NOT EXISTS idx_model_version_created_by_id ON model_version(created_by_id);
-CREATE INDEX IF NOT EXISTS idx_model_version_updated_by_id ON model_version(updated_by_id);
-CREATE INDEX IF NOT EXISTS idx_model_version_state ON model_version(state);
-CREATE INDEX IF NOT EXISTS idx_model_version_status ON model_version(status);
-CREATE INDEX IF NOT EXISTS idx_model_version_created_at ON model_version(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_model_version_is_default ON model_version(registered_model_id, is_default) WHERE is_default = true;
+CREATE INDEX idx_model_version_registered_model_id ON model_version(registered_model_id);
+CREATE INDEX idx_model_version_created_by_id ON model_version(created_by_id);
+CREATE INDEX idx_model_version_updated_by_id ON model_version(updated_by_id);
+CREATE INDEX idx_model_version_state ON model_version(state);
+CREATE INDEX idx_model_version_status ON model_version(status);
+CREATE INDEX idx_model_version_created_at ON model_version(created_at DESC);
+CREATE INDEX idx_model_version_is_default ON model_version(registered_model_id, is_default) WHERE is_default = true;
 
 -- Comments
+COMMENT ON TABLE registered_model IS 'Registered ML models scoped to projects';
+COMMENT ON TABLE model_version IS 'Versions of registered models with artifact metadata';
 COMMENT ON COLUMN registered_model.owner_email IS 'Denormalized owner email (synced from CMP)';
 COMMENT ON COLUMN registered_model.region_name IS 'Denormalized region name (synced from CMP)';
 COMMENT ON COLUMN model_version.created_by_email IS 'Denormalized creator email (synced from CMP)';

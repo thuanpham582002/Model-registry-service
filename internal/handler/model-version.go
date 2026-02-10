@@ -115,6 +115,7 @@ func (h *Handler) CreateModelVersion(c *gin.Context) {
 		req.ContainerImage, req.ModelCatalogName,
 		req.URI, req.AccessKey, req.SecretKey,
 		req.Labels, req.PrebuiltContainerID, nil,
+		req.CreatedByEmail, req.UpdatedByEmail,
 	)
 	if err != nil {
 		log.WithError(err).Error("create model version failed")

@@ -5,13 +5,13 @@ import (
 )
 
 type CreateRegisteredModelRequest struct {
-	Name        string            `json:"name" binding:"required,max=100"`
-	Description string            `json:"description"`
-	RegionID    uuid.UUID         `json:"region_id" binding:"required"`
-	ModelType   string            `json:"model_type"`
-	Tags        *TagsDTO          `json:"tags"`
-	Labels      map[string]string `json:"labels"`
-	ParentModelID *uuid.UUID      `json:"parent_model_id"`
+	Name          string            `json:"name" binding:"required,max=100"`
+	Description   string            `json:"description"`
+	OwnerEmail    string            `json:"owner_email"`
+	ModelType     string            `json:"model_type"`
+	Tags          *TagsDTO          `json:"tags"`
+	Labels        map[string]string `json:"labels"`
+	ParentModelID *uuid.UUID        `json:"parent_model_id"`
 }
 
 type UpdateRegisteredModelRequest struct {
@@ -42,8 +42,6 @@ type RegisteredModelResponse struct {
 	Name             string            `json:"name"`
 	Slug             string            `json:"slug"`
 	Description      string            `json:"description"`
-	RegionID         uuid.UUID         `json:"region_id"`
-	RegionName       string            `json:"region_name,omitempty"`
 	ModelType        string            `json:"model_type"`
 	ModelSize        int64             `json:"model_size"`
 	State            string            `json:"state"`

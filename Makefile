@@ -27,3 +27,18 @@ lint:
 
 tidy:
 	go mod tidy
+
+# Database migrations
+DATABASE_URL ?= postgres://postgres:postgres@localhost:5435/model_registry?sslmode=disable
+
+migrate-up:
+	@echo "Running migrations up..."
+	migrate -path migrations -database "$(DATABASE_URL)" up
+
+migrate-down:
+	@echo "Running migrations down..."
+	migrate -path migrations -database "$(DATABASE_URL)" down
+
+migrate-create:
+	@read -p "Migration name: " name; \
+	migrate create -ext sql -dir migrations -seq $$name

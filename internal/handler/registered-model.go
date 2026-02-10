@@ -119,8 +119,8 @@ func (h *Handler) CreateModel(c *gin.Context) {
 
 	model, err := h.modelUC.Create(
 		c.Request.Context(), projectID, nil,
-		req.Name, req.Description, req.RegionID,
-		req.ModelType, tags, req.Labels, req.ParentModelID,
+		req.Name, req.Description,
+		req.OwnerEmail, req.ModelType, tags, req.Labels, req.ParentModelID,
 	)
 	if err != nil {
 		log.WithError(err).Error("create model failed")
@@ -214,7 +214,7 @@ func (h *Handler) DeleteModel(c *gin.Context) {
 }
 
 func getProjectID(c *gin.Context) (uuid.UUID, error) {
-	header := c.GetHeader("X-Project-ID")
+	header := c.GetHeader("Project-ID")
 	if header == "" {
 		return uuid.Nil, domain.ErrMissingProjectID
 	}

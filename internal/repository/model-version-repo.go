@@ -30,19 +30,21 @@ func (r *modelVersionRepo) Create(ctx context.Context, version *domain.ModelVers
 	}
 
 	query := `
-		INSERT INTO model_registry_model_version
+		INSERT INTO model_version
 			(id, created_at, updated_at, registered_model_id, name, description,
 			 is_default, state, status, created_by_id, updated_by_id,
+			 created_by_email, updated_by_email,
 			 artifact_type, model_framework, model_framework_version,
 			 container_image, model_catalog_name, uri, access_key, secret_key,
 			 labels, prebuilt_container_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
 	`
 	_, err = r.pool.Exec(ctx, query,
 		version.ID, version.CreatedAt, version.UpdatedAt,
 		version.RegisteredModelID, version.Name, version.Description,
 		version.IsDefault, string(version.State), string(version.Status),
 		version.CreatedByID, version.UpdatedByID,
+		version.CreatedByEmail, version.UpdatedByEmail,
 		string(version.ArtifactType), version.ModelFramework, version.ModelFrameworkVersion,
 		version.ContainerImage, version.ModelCatalogName, version.URI,
 		version.AccessKey, version.SecretKey, labelsJSON, version.PrebuiltContainerID,
@@ -65,12 +67,10 @@ func (r *modelVersionRepo) GetByID(ctx context.Context, projectID uuid.UUID, id 
 			   mv.artifact_type, mv.model_framework, mv.model_framework_version,
 			   mv.container_image, mv.model_catalog_name, mv.uri,
 			   mv.access_key, mv.secret_key, mv.labels, mv.prebuilt_container_id,
-			   COALESCE(cb.email, '') AS created_by_email,
-			   COALESCE(ub.email, '') AS updated_by_email
-		FROM model_registry_model_version mv
-		JOIN model_registry_registered_model rm ON rm.id = mv.registered_model_id
-		LEFT JOIN tenant_user cb ON cb.id = mv.created_by_id
-		LEFT JOIN tenant_user ub ON ub.id = mv.updated_by_id
+			   COALESCE(mv.created_by_email, '') AS created_by_email,
+			   COALESCE(mv.updated_by_email, '') AS updated_by_email
+		FROM model_version mv
+		JOIN registered_model rm ON rm.id = mv.registered_model_id
 		WHERE mv.id = $1 AND rm.project_id = $2
 	`
 	v, err := scanVersionWithEmails(r.pool.QueryRow(ctx, query, id, projectID))
@@ -91,12 +91,10 @@ func (r *modelVersionRepo) GetByModelAndVersion(ctx context.Context, projectID u
 			   mv.artifact_type, mv.model_framework, mv.model_framework_version,
 			   mv.container_image, mv.model_catalog_name, mv.uri,
 			   mv.access_key, mv.secret_key, mv.labels, mv.prebuilt_container_id,
-			   COALESCE(cb.email, '') AS created_by_email,
-			   COALESCE(ub.email, '') AS updated_by_email
-		FROM model_registry_model_version mv
-		JOIN model_registry_registered_model rm ON rm.id = mv.registered_model_id
-		LEFT JOIN tenant_user cb ON cb.id = mv.created_by_id
-		LEFT JOIN tenant_user ub ON ub.id = mv.updated_by_id
+			   COALESCE(mv.created_by_email, '') AS created_by_email,
+			   COALESCE(mv.updated_by_email, '') AS updated_by_email
+		FROM model_version mv
+		JOIN registered_model rm ON rm.id = mv.registered_model_id
 		WHERE mv.registered_model_id = $1 AND mv.id = $2 AND rm.project_id = $3
 	`
 	v, err := scanVersionWithEmails(r.pool.QueryRow(ctx, query, modelID, versionID, projectID))
@@ -116,14 +114,14 @@ func (r *modelVersionRepo) Update(ctx context.Context, projectID uuid.UUID, vers
 	}
 
 	query := `
-		UPDATE model_registry_model_version
+		UPDATE model_version
 		SET name=$1, description=$2, is_default=$3, state=$4, status=$5,
 			updated_by_id=$6, artifact_type=$7, model_framework=$8,
 			model_framework_version=$9, container_image=$10, uri=$11,
 			labels=$12, updated_at=NOW()
 		WHERE id=$13
 			AND registered_model_id IN (
-				SELECT id FROM model_registry_registered_model WHERE project_id = $14
+				SELECT id FROM registered_model WHERE project_id = $14
 			)
 	`
 	result, err := r.pool.Exec(ctx, query,
@@ -182,10 +180,10 @@ func (r *modelVersionRepo) List(ctx context.Context, filter domain.VersionListFi
 
 	joinClause := ""
 	if needProjectJoin {
-		joinClause = "JOIN model_registry_registered_model rm ON rm.id = mv.registered_model_id"
+		joinClause = "JOIN registered_model rm ON rm.id = mv.registered_model_id"
 	}
 
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM model_registry_model_version mv %s WHERE %s", joinClause, whereClause)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM model_version mv %s WHERE %s", joinClause, whereClause)
 	var total int
 	if err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count model versions: %w", err)
@@ -207,12 +205,10 @@ func (r *modelVersionRepo) List(ctx context.Context, filter domain.VersionListFi
 			   mv.artifact_type, mv.model_framework, mv.model_framework_version,
 			   mv.container_image, mv.model_catalog_name, mv.uri,
 			   mv.access_key, mv.secret_key, mv.labels, mv.prebuilt_container_id,
-			   COALESCE(cb.email, '') AS created_by_email,
-			   COALESCE(ub.email, '') AS updated_by_email
-		FROM model_registry_model_version mv
+			   COALESCE(mv.created_by_email, '') AS created_by_email,
+			   COALESCE(mv.updated_by_email, '') AS updated_by_email
+		FROM model_version mv
 		%s
-		LEFT JOIN tenant_user cb ON cb.id = mv.created_by_id
-		LEFT JOIN tenant_user ub ON ub.id = mv.updated_by_id
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
@@ -281,12 +277,10 @@ func (r *modelVersionRepo) FindByParams(ctx context.Context, projectID uuid.UUID
 			   mv.artifact_type, mv.model_framework, mv.model_framework_version,
 			   mv.container_image, mv.model_catalog_name, mv.uri,
 			   mv.access_key, mv.secret_key, mv.labels, mv.prebuilt_container_id,
-			   COALESCE(cb.email, '') AS created_by_email,
-			   COALESCE(ub.email, '') AS updated_by_email
-		FROM model_registry_model_version mv
-		JOIN model_registry_registered_model rm ON rm.id = mv.registered_model_id
-		LEFT JOIN tenant_user cb ON cb.id = mv.created_by_id
-		LEFT JOIN tenant_user ub ON ub.id = mv.updated_by_id
+			   COALESCE(mv.created_by_email, '') AS created_by_email,
+			   COALESCE(mv.updated_by_email, '') AS updated_by_email
+		FROM model_version mv
+		JOIN registered_model rm ON rm.id = mv.registered_model_id
 		WHERE %s
 		LIMIT 1
 	`, strings.Join(conditions, " AND "))
