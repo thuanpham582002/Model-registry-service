@@ -110,7 +110,7 @@ func main() {
 	servingEnvSvc := services.NewServingEnvironmentService(servingEnvRepo, isvcRepo)
 	isvcSvc := services.NewInferenceServiceService(isvcRepo, servingEnvRepo, modelRepo, versionRepo)
 	serveModelSvc := services.NewServeModelService(serveModelRepo, isvcRepo, versionRepo)
-	deploySvc := services.NewDeployService(servingEnvRepo, isvcRepo, modelRepo, versionRepo, kserveClient)
+	deploySvc := services.NewDeployService(servingEnvRepo, isvcRepo, serveModelRepo, modelRepo, versionRepo, kserveClient)
 	trafficSvc := services.NewTrafficService(trafficConfigRepo, trafficVariantRepo, isvcRepo, versionRepo, servingEnvRepo, kserveClient, aiGatewayClient)
 	virtualModelSvc := services.NewVirtualModelService(virtualModelRepo, aiGatewayClient)
 	metricsSvc := services.NewMetricsService(prometheusClient, isvcRepo)

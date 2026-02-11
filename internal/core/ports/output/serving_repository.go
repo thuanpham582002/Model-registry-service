@@ -82,7 +82,6 @@ type InferenceServiceFilter struct {
 	ProjectID            uuid.UUID
 	ServingEnvironmentID *uuid.UUID
 	RegisteredModelID    *uuid.UUID
-	ModelVersionID       *uuid.UUID
 	DesiredState         string
 	CurrentState         string
 	SortBy               string

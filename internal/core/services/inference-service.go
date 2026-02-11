@@ -37,7 +37,6 @@ func (s *InferenceServiceService) Create(
 	name string,
 	servingEnvID uuid.UUID,
 	modelID uuid.UUID,
-	versionID *uuid.UUID,
 	runtime string,
 	labels map[string]string,
 ) (*domain.InferenceService, error) {
@@ -51,14 +50,7 @@ func (s *InferenceServiceService) Create(
 		return nil, err
 	}
 
-	// Validate version if provided
-	if versionID != nil {
-		if _, err := s.versionRepo.GetByID(ctx, projectID, *versionID); err != nil {
-			return nil, err
-		}
-	}
-
-	isvc, err := domain.NewInferenceService(projectID, name, servingEnvID, modelID, versionID)
+	isvc, err := domain.NewInferenceService(projectID, name, servingEnvID, modelID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,14 +112,6 @@ func (s *InferenceServiceService) Update(
 	}
 	if v, ok := updates["current_state"]; ok && v != nil {
 		isvc.CurrentState = domain.InferenceServiceState(v.(string))
-	}
-	if v, ok := updates["model_version_id"]; ok {
-		if v == nil {
-			isvc.ModelVersionID = nil
-		} else {
-			vID := v.(uuid.UUID)
-			isvc.ModelVersionID = &vID
-		}
 	}
 	if v, ok := updates["url"]; ok && v != nil {
 		isvc.URL = v.(string)

@@ -12,33 +12,36 @@ import (
 )
 
 type DeployService struct {
-	envRepo     output.ServingEnvironmentRepository
-	isvcRepo    output.InferenceServiceRepository
-	modelRepo   output.RegisteredModelRepository
-	versionRepo output.ModelVersionRepository
-	kserve      output.KServeClient
+	envRepo        output.ServingEnvironmentRepository
+	isvcRepo       output.InferenceServiceRepository
+	serveModelRepo output.ServeModelRepository
+	modelRepo      output.RegisteredModelRepository
+	versionRepo    output.ModelVersionRepository
+	kserve         output.KServeClient
 }
 
 func NewDeployService(
 	envRepo output.ServingEnvironmentRepository,
 	isvcRepo output.InferenceServiceRepository,
+	serveModelRepo output.ServeModelRepository,
 	modelRepo output.RegisteredModelRepository,
 	versionRepo output.ModelVersionRepository,
 	kserve output.KServeClient,
 ) *DeployService {
 	return &DeployService{
-		envRepo:     envRepo,
-		isvcRepo:    isvcRepo,
-		modelRepo:   modelRepo,
-		versionRepo: versionRepo,
-		kserve:      kserve,
+		envRepo:        envRepo,
+		isvcRepo:       isvcRepo,
+		serveModelRepo: serveModelRepo,
+		modelRepo:      modelRepo,
+		versionRepo:    versionRepo,
+		kserve:         kserve,
 	}
 }
 
 type DeployRequest struct {
 	ProjectID            uuid.UUID
 	RegisteredModelID    uuid.UUID
-	ModelVersionID       *uuid.UUID
+	ModelVersionIDs      []uuid.UUID // Support multiple versions for multi-model serving
 	ServingEnvironmentID uuid.UUID
 	Name                 string
 	Labels               map[string]string
@@ -46,6 +49,7 @@ type DeployRequest struct {
 
 type DeployResult struct {
 	InferenceService *domain.InferenceService
+	ServedModels     []*domain.ServeModel
 	Status           string // PENDING, DEPLOYED, FAILED
 	Message          string
 }
@@ -63,25 +67,27 @@ func (s *DeployService) Deploy(ctx context.Context, req DeployRequest) (*DeployR
 		return nil, fmt.Errorf("get model: %w", err)
 	}
 
-	// 3. Get version (specified or default/latest)
-	version, err := s.resolveVersion(ctx, req.ProjectID, req.RegisteredModelID, req.ModelVersionID, model)
+	// 3. Resolve versions (use provided list or resolve default)
+	versions, err := s.resolveVersions(ctx, req.ProjectID, req.RegisteredModelID, req.ModelVersionIDs, model)
 	if err != nil {
 		return nil, err
 	}
 
-	// 4. Validate version is ready
-	if version.Status != domain.VersionStatusReady {
-		return nil, domain.ErrVersionNotReady
+	// 4. Validate all versions are ready
+	for _, version := range versions {
+		if version.Status != domain.VersionStatusReady {
+			return nil, fmt.Errorf("version %s: %w", version.Name, domain.ErrVersionNotReady)
+		}
 	}
 
 	// 5. Generate name if not provided
 	name := req.Name
 	if name == "" {
-		name = fmt.Sprintf("%s-%s", model.Slug, version.ID.String()[:8])
+		name = fmt.Sprintf("%s-%s", model.Slug, versions[0].ID.String()[:8])
 	}
 
-	// 6. Create InferenceService entity
-	isvc, err := domain.NewInferenceService(req.ProjectID, name, env.ID, model.ID, &version.ID)
+	// 6. Create InferenceService entity (without model_version_id)
+	isvc, err := domain.NewInferenceService(req.ProjectID, name, env.ID, model.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,27 +95,51 @@ func (s *DeployService) Deploy(ctx context.Context, req DeployRequest) (*DeployR
 		isvc.Labels = req.Labels
 	}
 
-	// 7. Save to database
+	// 7. Save inference service to database
 	if err := s.isvcRepo.Create(ctx, isvc); err != nil {
 		return nil, fmt.Errorf("create inference service: %w", err)
 	}
 
+	// 8. Create ServeModel entries for each version
+	var servedModels []*domain.ServeModel
+	for _, version := range versions {
+		sm, err := domain.NewServeModel(req.ProjectID, isvc.ID, version.ID)
+		if err != nil {
+			return nil, fmt.Errorf("create serve model: %w", err)
+		}
+		if err := s.serveModelRepo.Create(ctx, sm); err != nil {
+			return nil, fmt.Errorf("save serve model: %w", err)
+		}
+		servedModels = append(servedModels, sm)
+	}
+
 	// Fetch with joined fields
 	isvc, _ = s.isvcRepo.GetByID(ctx, req.ProjectID, isvc.ID)
+	isvc.ServedModels = servedModels
 
-	// 8. Deploy to KServe (if available)
+	// 9. Deploy to KServe (if available) - deploy first version as primary
 	if s.kserve != nil && s.kserve.IsAvailable() {
 		namespace := env.ExternalID
 		if namespace == "" {
 			namespace = env.Name
 		}
 
-		deployment, err := s.kserve.Deploy(ctx, namespace, isvc, version)
+		// For multi-model, KServe may need different handling
+		// Currently deploy with first version as primary
+		deployment, err := s.kserve.Deploy(ctx, namespace, isvc, versions[0])
 		if err != nil {
 			isvc.MarkFailed(err.Error())
 			s.isvcRepo.Update(ctx, req.ProjectID, isvc)
+
+			// Mark all serve models as failed
+			for _, sm := range servedModels {
+				sm.SetState(domain.ServeStateFailed)
+				s.serveModelRepo.Update(ctx, req.ProjectID, sm)
+			}
+
 			return &DeployResult{
 				InferenceService: isvc,
+				ServedModels:     servedModels,
 				Status:           "FAILED",
 				Message:          err.Error(),
 			}, nil
@@ -121,9 +151,49 @@ func (s *DeployService) Deploy(ctx context.Context, req DeployRequest) (*DeployR
 
 	return &DeployResult{
 		InferenceService: isvc,
+		ServedModels:     servedModels,
 		Status:           "PENDING",
 		Message:          "Deployment initiated",
 	}, nil
+}
+
+// AddModelVersion adds a model version to an existing inference service
+func (s *DeployService) AddModelVersion(ctx context.Context, projectID, isvcID, versionID uuid.UUID) (*domain.ServeModel, error) {
+	// Validate inference service exists
+	isvc, err := s.isvcRepo.GetByID(ctx, projectID, isvcID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate version exists and is ready
+	version, err := s.versionRepo.GetByID(ctx, projectID, versionID)
+	if err != nil {
+		return nil, err
+	}
+	if version.Status != domain.VersionStatusReady {
+		return nil, domain.ErrVersionNotReady
+	}
+
+	// Create ServeModel
+	sm, err := domain.NewServeModel(projectID, isvc.ID, versionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.serveModelRepo.Create(ctx, sm); err != nil {
+		return nil, fmt.Errorf("create serve model: %w", err)
+	}
+
+	return s.serveModelRepo.GetByID(ctx, projectID, sm.ID)
+}
+
+// RemoveModelVersion removes a model version from an inference service
+func (s *DeployService) RemoveModelVersion(ctx context.Context, projectID, serveModelID uuid.UUID) error {
+	return s.serveModelRepo.Delete(ctx, projectID, serveModelID)
+}
+
+// GetServedModels returns all model versions served by an inference service
+func (s *DeployService) GetServedModels(ctx context.Context, projectID, isvcID uuid.UUID) ([]*domain.ServeModel, error) {
+	return s.serveModelRepo.FindByInferenceService(ctx, projectID, isvcID)
 }
 
 func (s *DeployService) Undeploy(ctx context.Context, projectID, isvcID uuid.UUID) error {
@@ -182,6 +252,13 @@ func (s *DeployService) SyncStatus(ctx context.Context, projectID, isvcID uuid.U
 
 	if status.Ready {
 		isvc.MarkDeployed(status.URL)
+
+		// Update serve model states to running
+		servedModels, _ := s.serveModelRepo.FindByInferenceService(ctx, projectID, isvcID)
+		for _, sm := range servedModels {
+			sm.SetState(domain.ServeStateRunning)
+			s.serveModelRepo.Update(ctx, projectID, sm)
+		}
 	} else if status.Error != "" {
 		isvc.MarkFailed(status.Error)
 	}
@@ -191,27 +268,40 @@ func (s *DeployService) SyncStatus(ctx context.Context, projectID, isvcID uuid.U
 		return nil, err
 	}
 
-	return s.isvcRepo.GetByID(ctx, projectID, isvcID)
+	// Load served models
+	isvc, _ = s.isvcRepo.GetByID(ctx, projectID, isvcID)
+	isvc.ServedModels, _ = s.serveModelRepo.FindByInferenceService(ctx, projectID, isvcID)
+
+	return isvc, nil
 }
 
-func (s *DeployService) resolveVersion(
+func (s *DeployService) resolveVersions(
 	ctx context.Context,
 	projectID, modelID uuid.UUID,
-	versionID *uuid.UUID,
+	versionIDs []uuid.UUID,
 	model *domain.RegisteredModel,
-) (*domain.ModelVersion, error) {
-	if versionID != nil {
-		return s.versionRepo.GetByID(ctx, projectID, *versionID)
+) ([]*domain.ModelVersion, error) {
+	// If specific versions provided, use them
+	if len(versionIDs) > 0 {
+		var versions []*domain.ModelVersion
+		for _, vID := range versionIDs {
+			v, err := s.versionRepo.GetByID(ctx, projectID, vID)
+			if err != nil {
+				return nil, fmt.Errorf("get version %s: %w", vID.String(), err)
+			}
+			versions = append(versions, v)
+		}
+		return versions, nil
 	}
 
 	// Try default version from model
 	if model.DefaultVersion != nil {
-		return model.DefaultVersion, nil
+		return []*domain.ModelVersion{model.DefaultVersion}, nil
 	}
 
 	// Try latest version from model
 	if model.LatestVersion != nil {
-		return model.LatestVersion, nil
+		return []*domain.ModelVersion{model.LatestVersion}, nil
 	}
 
 	return nil, fmt.Errorf("no model version available for deployment")

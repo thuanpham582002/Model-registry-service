@@ -34,15 +34,15 @@ func (r *inferenceServiceRepo) Create(ctx context.Context, isvc *domain.Inferenc
 	query := `
 		INSERT INTO inference_service
 			(id, created_at, updated_at, project_id, name, external_id,
-			 serving_environment_id, registered_model_id, model_version_id,
+			 serving_environment_id, registered_model_id,
 			 desired_state, current_state, runtime, url, last_error, labels)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 
 	_, err = r.pool.Exec(ctx, query,
 		isvc.ID, isvc.CreatedAt, isvc.UpdatedAt,
 		isvc.ProjectID, isvc.Name, isvc.ExternalID,
-		isvc.ServingEnvironmentID, isvc.RegisteredModelID, isvc.ModelVersionID,
+		isvc.ServingEnvironmentID, isvc.RegisteredModelID,
 		string(isvc.DesiredState), string(isvc.CurrentState),
 		isvc.Runtime, isvc.URL, isvc.LastError, labelsJSON,
 	)
@@ -60,15 +60,13 @@ func (r *inferenceServiceRepo) GetByID(ctx context.Context, projectID, id uuid.U
 	query := `
 		SELECT
 			i.id, i.created_at, i.updated_at, i.project_id, i.name, i.external_id,
-			i.serving_environment_id, i.registered_model_id, i.model_version_id,
+			i.serving_environment_id, i.registered_model_id,
 			i.desired_state, i.current_state, i.runtime, i.url, i.last_error, i.labels,
 			se.name AS serving_environment_name,
-			rm.name AS registered_model_name,
-			COALESCE(mv.name, '') AS model_version_name
+			rm.name AS registered_model_name
 		FROM inference_service i
 		JOIN serving_environment se ON se.id = i.serving_environment_id
 		JOIN registered_model rm ON rm.id = i.registered_model_id
-		LEFT JOIN model_version mv ON mv.id = i.model_version_id
 		WHERE i.id = $1 AND i.project_id = $2
 	`
 
@@ -86,15 +84,13 @@ func (r *inferenceServiceRepo) GetByExternalID(ctx context.Context, projectID uu
 	query := `
 		SELECT
 			i.id, i.created_at, i.updated_at, i.project_id, i.name, i.external_id,
-			i.serving_environment_id, i.registered_model_id, i.model_version_id,
+			i.serving_environment_id, i.registered_model_id,
 			i.desired_state, i.current_state, i.runtime, i.url, i.last_error, i.labels,
 			se.name AS serving_environment_name,
-			rm.name AS registered_model_name,
-			COALESCE(mv.name, '') AS model_version_name
+			rm.name AS registered_model_name
 		FROM inference_service i
 		JOIN serving_environment se ON se.id = i.serving_environment_id
 		JOIN registered_model rm ON rm.id = i.registered_model_id
-		LEFT JOIN model_version mv ON mv.id = i.model_version_id
 		WHERE i.external_id = $1 AND i.project_id = $2
 	`
 
@@ -112,15 +108,13 @@ func (r *inferenceServiceRepo) GetByName(ctx context.Context, projectID, envID u
 	query := `
 		SELECT
 			i.id, i.created_at, i.updated_at, i.project_id, i.name, i.external_id,
-			i.serving_environment_id, i.registered_model_id, i.model_version_id,
+			i.serving_environment_id, i.registered_model_id,
 			i.desired_state, i.current_state, i.runtime, i.url, i.last_error, i.labels,
 			se.name AS serving_environment_name,
-			rm.name AS registered_model_name,
-			COALESCE(mv.name, '') AS model_version_name
+			rm.name AS registered_model_name
 		FROM inference_service i
 		JOIN serving_environment se ON se.id = i.serving_environment_id
 		JOIN registered_model rm ON rm.id = i.registered_model_id
-		LEFT JOIN model_version mv ON mv.id = i.model_version_id
 		WHERE i.serving_environment_id = $1 AND i.name = $2 AND i.project_id = $3
 	`
 
@@ -142,14 +136,14 @@ func (r *inferenceServiceRepo) Update(ctx context.Context, projectID uuid.UUID, 
 
 	query := `
 		UPDATE inference_service
-		SET name = $1, external_id = $2, model_version_id = $3,
-			desired_state = $4, current_state = $5, runtime = $6,
-			url = $7, last_error = $8, labels = $9, updated_at = NOW()
-		WHERE id = $10 AND project_id = $11
+		SET name = $1, external_id = $2,
+			desired_state = $3, current_state = $4, runtime = $5,
+			url = $6, last_error = $7, labels = $8, updated_at = NOW()
+		WHERE id = $9 AND project_id = $10
 	`
 
 	result, err := r.pool.Exec(ctx, query,
-		isvc.Name, isvc.ExternalID, isvc.ModelVersionID,
+		isvc.Name, isvc.ExternalID,
 		string(isvc.DesiredState), string(isvc.CurrentState), isvc.Runtime,
 		isvc.URL, isvc.LastError, labelsJSON,
 		isvc.ID, projectID,
@@ -195,11 +189,6 @@ func (r *inferenceServiceRepo) List(ctx context.Context, filter output.Inference
 		args = append(args, *filter.RegisteredModelID)
 		argPos++
 	}
-	if filter.ModelVersionID != nil {
-		conditions = append(conditions, fmt.Sprintf("i.model_version_id = $%d", argPos))
-		args = append(args, *filter.ModelVersionID)
-		argPos++
-	}
 	if filter.DesiredState != "" {
 		conditions = append(conditions, fmt.Sprintf("i.desired_state = $%d", argPos))
 		args = append(args, filter.DesiredState)
@@ -235,15 +224,13 @@ func (r *inferenceServiceRepo) List(ctx context.Context, filter output.Inference
 	query := fmt.Sprintf(`
 		SELECT
 			i.id, i.created_at, i.updated_at, i.project_id, i.name, i.external_id,
-			i.serving_environment_id, i.registered_model_id, i.model_version_id,
+			i.serving_environment_id, i.registered_model_id,
 			i.desired_state, i.current_state, i.runtime, i.url, i.last_error, i.labels,
 			se.name AS serving_environment_name,
-			rm.name AS registered_model_name,
-			COALESCE(mv.name, '') AS model_version_name
+			rm.name AS registered_model_name
 		FROM inference_service i
 		JOIN serving_environment se ON se.id = i.serving_environment_id
 		JOIN registered_model rm ON rm.id = i.registered_model_id
-		LEFT JOIN model_version mv ON mv.id = i.model_version_id
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
@@ -306,9 +293,9 @@ func (r *inferenceServiceRepo) scanIsvc(row pgx.Row) (*domain.InferenceService, 
 	err := row.Scan(
 		&isvc.ID, &isvc.CreatedAt, &isvc.UpdatedAt,
 		&isvc.ProjectID, &isvc.Name, &isvc.ExternalID,
-		&isvc.ServingEnvironmentID, &isvc.RegisteredModelID, &isvc.ModelVersionID,
+		&isvc.ServingEnvironmentID, &isvc.RegisteredModelID,
 		&desiredState, &currentState, &isvc.Runtime, &isvc.URL, &isvc.LastError, &labelsJSON,
-		&isvc.ServingEnvironmentName, &isvc.RegisteredModelName, &isvc.ModelVersionName,
+		&isvc.ServingEnvironmentName, &isvc.RegisteredModelName,
 	)
 	if err != nil {
 		return nil, err
@@ -337,9 +324,9 @@ func (r *inferenceServiceRepo) scanIsvcFromRows(rows pgx.Rows) (*domain.Inferenc
 	err := rows.Scan(
 		&isvc.ID, &isvc.CreatedAt, &isvc.UpdatedAt,
 		&isvc.ProjectID, &isvc.Name, &isvc.ExternalID,
-		&isvc.ServingEnvironmentID, &isvc.RegisteredModelID, &isvc.ModelVersionID,
+		&isvc.ServingEnvironmentID, &isvc.RegisteredModelID,
 		&desiredState, &currentState, &isvc.Runtime, &isvc.URL, &isvc.LastError, &labelsJSON,
-		&isvc.ServingEnvironmentName, &isvc.RegisteredModelName, &isvc.ModelVersionName,
+		&isvc.ServingEnvironmentName, &isvc.RegisteredModelName,
 	)
 	if err != nil {
 		return nil, err

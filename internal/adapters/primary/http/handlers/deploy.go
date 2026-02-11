@@ -28,7 +28,7 @@ func (h *Handler) DeployModel(c *gin.Context) {
 	result, err := h.deploySvc.Deploy(c.Request.Context(), services.DeployRequest{
 		ProjectID:            projectID,
 		RegisteredModelID:    req.RegisteredModelID,
-		ModelVersionID:       req.ModelVersionID,
+		ModelVersionIDs:      req.ModelVersionIDs,
 		ServingEnvironmentID: req.ServingEnvironmentID,
 		Name:                 req.Name,
 		Labels:               req.Labels,

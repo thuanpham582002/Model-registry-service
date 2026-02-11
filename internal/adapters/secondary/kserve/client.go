@@ -136,8 +136,9 @@ func (c *kserveClient) buildInferenceServiceCR(
 		"modelregistry.ai-platform/inference-service-id": isvc.ID.String(),
 		"modelregistry.ai-platform/registered-model-id":  isvc.RegisteredModelID.String(),
 	}
-	if isvc.ModelVersionID != nil {
-		labels["modelregistry.ai-platform/model-version-id"] = isvc.ModelVersionID.String()
+	// Add version ID from the version parameter (supports multi-model via serve_model)
+	if version != nil {
+		labels["modelregistry.ai-platform/model-version-id"] = version.ID.String()
 	}
 
 	// Merge user labels

@@ -44,11 +44,6 @@ func (h *Handler) ListInferenceServices(c *gin.Context) {
 			filter.RegisteredModelID = &id
 		}
 	}
-	if versionID := c.Query("model_version_id"); versionID != "" {
-		if id, err := uuid.Parse(versionID); err == nil {
-			filter.ModelVersionID = &id
-		}
-	}
 
 	isvcs, total, err := h.isvcSvc.List(c.Request.Context(), filter)
 	if err != nil {
@@ -150,7 +145,6 @@ func (h *Handler) CreateInferenceService(c *gin.Context) {
 		req.Name,
 		req.ServingEnvironmentID,
 		req.RegisteredModelID,
-		req.ModelVersionID,
 		req.Runtime,
 		req.Labels,
 	)
@@ -194,9 +188,6 @@ func (h *Handler) UpdateInferenceService(c *gin.Context) {
 	}
 	if req.CurrentState != nil {
 		updates["current_state"] = *req.CurrentState
-	}
-	if req.ModelVersionID != nil {
-		updates["model_version_id"] = *req.ModelVersionID
 	}
 	if req.URL != nil {
 		updates["url"] = *req.URL

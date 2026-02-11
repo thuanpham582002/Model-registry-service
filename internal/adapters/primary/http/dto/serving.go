@@ -59,40 +59,38 @@ type CreateInferenceServiceRequest struct {
 	Name                 string            `json:"name" binding:"required,max=100"`
 	ServingEnvironmentID uuid.UUID         `json:"serving_environment_id" binding:"required"`
 	RegisteredModelID    uuid.UUID         `json:"registered_model_id" binding:"required"`
-	ModelVersionID       *uuid.UUID        `json:"model_version_id"`
+	ModelVersionIDs      []uuid.UUID       `json:"model_version_ids"` // Support multi-model serving
 	Runtime              string            `json:"runtime"`
 	Labels               map[string]string `json:"labels"`
 }
 
 type UpdateInferenceServiceRequest struct {
-	Name           *string           `json:"name"`
-	DesiredState   *string           `json:"desired_state"`
-	CurrentState   *string           `json:"current_state"`
-	ModelVersionID *uuid.UUID        `json:"model_version_id"`
-	ExternalID     *string           `json:"external_id"`
-	URL            *string           `json:"url"`
-	LastError      *string           `json:"last_error"`
-	Labels         map[string]string `json:"labels"`
+	Name         *string           `json:"name"`
+	DesiredState *string           `json:"desired_state"`
+	CurrentState *string           `json:"current_state"`
+	ExternalID   *string           `json:"external_id"`
+	URL          *string           `json:"url"`
+	LastError    *string           `json:"last_error"`
+	Labels       map[string]string `json:"labels"`
 }
 
 type InferenceServiceResponse struct {
-	ID                     uuid.UUID         `json:"id"`
-	CreatedAt              time.Time         `json:"created_at"`
-	UpdatedAt              time.Time         `json:"updated_at"`
-	Name                   string            `json:"name"`
-	ExternalID             string            `json:"external_id,omitempty"`
-	ServingEnvironmentID   uuid.UUID         `json:"serving_environment_id"`
-	ServingEnvironmentName string            `json:"serving_environment_name,omitempty"`
-	RegisteredModelID      uuid.UUID         `json:"registered_model_id"`
-	RegisteredModelName    string            `json:"registered_model_name,omitempty"`
-	ModelVersionID         *uuid.UUID        `json:"model_version_id,omitempty"`
-	ModelVersionName       string            `json:"model_version_name,omitempty"`
-	DesiredState           string            `json:"desired_state"`
-	CurrentState           string            `json:"current_state"`
-	Runtime                string            `json:"runtime"`
-	URL                    string            `json:"url,omitempty"`
-	LastError              string            `json:"last_error,omitempty"`
-	Labels                 map[string]string `json:"labels"`
+	ID                     uuid.UUID            `json:"id"`
+	CreatedAt              time.Time            `json:"created_at"`
+	UpdatedAt              time.Time            `json:"updated_at"`
+	Name                   string               `json:"name"`
+	ExternalID             string               `json:"external_id,omitempty"`
+	ServingEnvironmentID   uuid.UUID            `json:"serving_environment_id"`
+	ServingEnvironmentName string               `json:"serving_environment_name,omitempty"`
+	RegisteredModelID      uuid.UUID            `json:"registered_model_id"`
+	RegisteredModelName    string               `json:"registered_model_name,omitempty"`
+	DesiredState           string               `json:"desired_state"`
+	CurrentState           string               `json:"current_state"`
+	Runtime                string               `json:"runtime"`
+	URL                    string               `json:"url,omitempty"`
+	LastError              string               `json:"last_error,omitempty"`
+	Labels                 map[string]string    `json:"labels"`
+	ServedModels           []ServeModelResponse `json:"served_models,omitempty"`
 }
 
 type ListInferenceServicesResponse struct {
@@ -107,6 +105,13 @@ func ToInferenceServiceResponse(isvc *domain.InferenceService) InferenceServiceR
 	if labels == nil {
 		labels = make(map[string]string)
 	}
+
+	// Convert served models
+	var servedModels []ServeModelResponse
+	for _, sm := range isvc.ServedModels {
+		servedModels = append(servedModels, ToServeModelResponse(sm))
+	}
+
 	return InferenceServiceResponse{
 		ID:                     isvc.ID,
 		CreatedAt:              isvc.CreatedAt,
@@ -117,14 +122,13 @@ func ToInferenceServiceResponse(isvc *domain.InferenceService) InferenceServiceR
 		ServingEnvironmentName: isvc.ServingEnvironmentName,
 		RegisteredModelID:      isvc.RegisteredModelID,
 		RegisteredModelName:    isvc.RegisteredModelName,
-		ModelVersionID:         isvc.ModelVersionID,
-		ModelVersionName:       isvc.ModelVersionName,
 		DesiredState:           string(isvc.DesiredState),
 		CurrentState:           string(isvc.CurrentState),
 		Runtime:                isvc.Runtime,
 		URL:                    isvc.URL,
 		LastError:              isvc.LastError,
 		Labels:                 labels,
+		ServedModels:           servedModels,
 	}
 }
 
@@ -174,7 +178,7 @@ func ToServeModelResponse(sm *domain.ServeModel) ServeModelResponse {
 
 type DeployModelRequest struct {
 	RegisteredModelID    uuid.UUID         `json:"registered_model_id" binding:"required"`
-	ModelVersionID       *uuid.UUID        `json:"model_version_id"`
+	ModelVersionIDs      []uuid.UUID       `json:"model_version_ids"` // Support multi-model serving
 	ServingEnvironmentID uuid.UUID         `json:"serving_environment_id" binding:"required"`
 	Name                 string            `json:"name"`
 	Labels               map[string]string `json:"labels"`

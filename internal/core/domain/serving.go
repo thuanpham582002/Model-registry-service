@@ -93,7 +93,6 @@ type InferenceService struct {
 	ExternalID           string                `json:"external_id"` // K8s resource UID
 	ServingEnvironmentID uuid.UUID             `json:"serving_environment_id"`
 	RegisteredModelID    uuid.UUID             `json:"registered_model_id"`
-	ModelVersionID       *uuid.UUID            `json:"model_version_id"`
 	DesiredState         InferenceServiceState `json:"desired_state"`
 	CurrentState         InferenceServiceState `json:"current_state"`
 	Runtime              string                `json:"runtime"` // e.g., "kserve"
@@ -104,7 +103,9 @@ type InferenceService struct {
 	// Computed/joined fields
 	ServingEnvironmentName string `json:"serving_environment_name,omitempty"`
 	RegisteredModelName    string `json:"registered_model_name,omitempty"`
-	ModelVersionName       string `json:"model_version_name,omitempty"`
+
+	// Related entities (loaded via serve_model junction)
+	ServedModels []*ServeModel `json:"served_models,omitempty"`
 }
 
 // NewInferenceService creates a new InferenceService with validation
@@ -113,7 +114,6 @@ func NewInferenceService(
 	name string,
 	envID uuid.UUID,
 	modelID uuid.UUID,
-	versionID *uuid.UUID,
 ) (*InferenceService, error) {
 	if name == "" {
 		return nil, ErrInvalidInferenceServiceName
@@ -137,7 +137,6 @@ func NewInferenceService(
 		Name:                 name,
 		ServingEnvironmentID: envID,
 		RegisteredModelID:    modelID,
-		ModelVersionID:       versionID,
 		DesiredState:         ISStateDeployed,
 		CurrentState:         ISStateUndeployed,
 		Runtime:              "kserve",
