@@ -1,5 +1,5 @@
 -- Model Registry Service - Initial Schema
--- SYNC pattern: Go MR stores owner_email, region_name locally (no JOINs to CMP)
+-- SYNC pattern: Go MR stores owner_email locally (no JOINs to CMP)
 
 -- Core tables
 CREATE TABLE IF NOT EXISTS registered_model (
@@ -12,8 +12,6 @@ CREATE TABLE IF NOT EXISTS registered_model (
     name VARCHAR(100) NOT NULL,
     slug VARCHAR(100) NOT NULL DEFAULT '',
     description TEXT NOT NULL DEFAULT '',
-    region_id UUID NOT NULL,
-    region_name VARCHAR(100) NOT NULL DEFAULT '',
     model_type VARCHAR(50) NOT NULL DEFAULT 'CUSTOMTRAIN',
     model_size BIGINT NOT NULL DEFAULT 0,
     state VARCHAR(50) NOT NULL DEFAULT 'LIVE',
@@ -64,7 +62,6 @@ CREATE TABLE IF NOT EXISTS model_version (
 
 -- Indexes for registered_model
 CREATE INDEX idx_registered_model_project_id ON registered_model(project_id);
-CREATE INDEX idx_registered_model_region_id ON registered_model(region_id);
 CREATE INDEX idx_registered_model_owner_id ON registered_model(owner_id);
 CREATE INDEX idx_registered_model_state ON registered_model(state);
 CREATE INDEX idx_registered_model_created_at ON registered_model(created_at DESC);
@@ -83,6 +80,5 @@ CREATE INDEX idx_model_version_is_default ON model_version(registered_model_id, 
 COMMENT ON TABLE registered_model IS 'Registered ML models scoped to projects';
 COMMENT ON TABLE model_version IS 'Versions of registered models with artifact metadata';
 COMMENT ON COLUMN registered_model.owner_email IS 'Denormalized owner email (synced from CMP)';
-COMMENT ON COLUMN registered_model.region_name IS 'Denormalized region name (synced from CMP)';
 COMMENT ON COLUMN model_version.created_by_email IS 'Denormalized creator email (synced from CMP)';
 COMMENT ON COLUMN model_version.updated_by_email IS 'Denormalized updater email (synced from CMP)';
