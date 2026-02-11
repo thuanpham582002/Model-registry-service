@@ -20,7 +20,6 @@ import requests
 
 BASE = "http://localhost:8080/api/v1/model-registry"
 PROJECT_ID = str(uuid.uuid4())
-REGION_ID = str(uuid.uuid4())
 
 passed = 0
 failed = 0
@@ -62,7 +61,7 @@ def wait_for_service(url: str, timeout: int = 30):
 # ---------------------------------------------------------------------------
 MODEL_FIELDS = [
     "id", "name", "state", "description", "slug", "project_id",
-    "region_id", "model_type", "model_size", "deployment_status",
+    "model_type", "model_size", "deployment_status",
     "tags", "labels", "version_count", "created_at", "updated_at",
 ]
 
@@ -90,7 +89,6 @@ def test_create_model() -> str:
     print("\n--- TestE2E_CreateModel ---")
     payload = {
         "name": "sdk-test-model",
-        "region_id": REGION_ID,
         "model_type": "CUSTOMTRAIN",
         "tags": {
             "frameworks": ["pytorch"],

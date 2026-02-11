@@ -1,0 +1,63 @@
+# RBAC for Model Registry to manage AI Gateway CRDs
+# Apply with: kubectl apply -f aigateway-rbac.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: model-registry-aigateway
+  labels:
+    app.kubernetes.io/name: model-registry
+    app.kubernetes.io/component: aigateway-integration
+rules:
+  # AI Gateway CRDs (aigateway.envoyproxy.io)
+  - apiGroups: ["aigateway.envoyproxy.io"]
+    resources:
+      - aigatewayroutes
+      - aiservicebackends
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["aigateway.envoyproxy.io"]
+    resources:
+      - aigatewayroutes/status
+      - aiservicebackends/status
+    verbs: ["get", "list", "watch"]
+
+  # Envoy Gateway CRDs (gateway.envoyproxy.io)
+  - apiGroups: ["gateway.envoyproxy.io"]
+    resources:
+      - backends
+      - backendtrafficpolicies
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["gateway.envoyproxy.io"]
+    resources:
+      - backends/status
+      - backendtrafficpolicies/status
+    verbs: ["get", "list", "watch"]
+
+  # Gateway API (read-only for status checking)
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources:
+      - gateways
+      - httproutes
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources:
+      - gateways/status
+      - httproutes/status
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: model-registry-aigateway
+  labels:
+    app.kubernetes.io/name: model-registry
+    app.kubernetes.io/component: aigateway-integration
+subjects:
+  - kind: ServiceAccount
+    name: model-registry
+    namespace: model-registry
+roleRef:
+  kind: ClusterRole
+  name: model-registry-aigateway
+  apiGroup: rbac.authorization.k8s.io

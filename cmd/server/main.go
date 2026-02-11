@@ -9,11 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	"model-registry-service/internal/adapters/primary/http/handlers"
+	"model-registry-service/internal/adapters/primary/http/middleware"
+	"model-registry-service/internal/adapters/secondary/aigateway"
+	"model-registry-service/internal/adapters/secondary/kserve"
+	"model-registry-service/internal/adapters/secondary/postgres"
+	"model-registry-service/internal/adapters/secondary/prometheus"
 	"model-registry-service/internal/config"
-	"model-registry-service/internal/handler"
-	"model-registry-service/internal/middleware"
-	"model-registry-service/internal/repository"
-	"model-registry-service/internal/usecase"
+	output "model-registry-service/internal/core/ports/output"
+	"model-registry-service/internal/core/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -48,15 +52,71 @@ func main() {
 	}
 	log.Info("database connection established")
 
-	// Create layers
-	modelRepo := repository.NewRegisteredModelRepository(pool)
-	versionRepo := repository.NewModelVersionRepository(pool)
+	// ============================================================================
+	// Hexagonal Architecture Wiring
+	// ============================================================================
 
-	modelUC := usecase.NewRegisteredModelUseCase(modelRepo)
-	versionUC := usecase.NewModelVersionUseCase(versionRepo, modelRepo)
-	artifactUC := usecase.NewModelArtifactUseCase(versionRepo, modelRepo)
+	// Secondary Adapters (Output Ports - Repositories)
+	modelRepo := postgres.NewRegisteredModelRepository(pool)
+	versionRepo := postgres.NewModelVersionRepository(pool)
+	servingEnvRepo := postgres.NewServingEnvironmentRepository(pool)
+	isvcRepo := postgres.NewInferenceServiceRepository(pool)
+	serveModelRepo := postgres.NewServeModelRepository(pool)
+	trafficConfigRepo := postgres.NewTrafficConfigRepository(pool)
+	trafficVariantRepo := postgres.NewTrafficVariantRepository(pool)
+	virtualModelRepo := postgres.NewVirtualModelRepository(pool)
 
-	h := handler.New(modelUC, versionUC, artifactUC)
+	// KServe Client (Optional - based on config)
+	var kserveClient output.KServeClient
+	if cfg.Kubernetes.Enabled {
+		client, err := kserve.NewKServeClient(&cfg.Kubernetes)
+		if err != nil {
+			log.Warnf("KServe client init failed (continuing without K8s integration): %v", err)
+		} else {
+			kserveClient = client
+			log.Info("KServe client initialized")
+		}
+	} else {
+		log.Info("KServe integration disabled")
+	}
+
+	// AI Gateway Client (Optional - based on config)
+	var aiGatewayClient output.AIGatewayClient
+	if cfg.AIGateway.Enabled {
+		client, err := aigateway.NewAIGatewayClient(&cfg.AIGateway)
+		if err != nil {
+			log.Warnf("AI Gateway client init failed (continuing without AI Gateway integration): %v", err)
+		} else {
+			aiGatewayClient = client
+			log.Info("AI Gateway client initialized")
+		}
+	} else {
+		log.Info("AI Gateway integration disabled")
+	}
+
+	// Prometheus Client (Optional - based on config)
+	var prometheusClient output.PrometheusClient
+	if cfg.Prometheus.Enabled {
+		prometheusClient = prometheus.NewPrometheusClient(&cfg.Prometheus)
+		log.Info("Prometheus client initialized")
+	} else {
+		log.Info("Prometheus integration disabled")
+	}
+
+	// Core Services (Application Layer)
+	modelSvc := services.NewRegisteredModelService(modelRepo)
+	versionSvc := services.NewModelVersionService(versionRepo, modelRepo)
+	artifactSvc := services.NewModelArtifactService(versionRepo, modelRepo)
+	servingEnvSvc := services.NewServingEnvironmentService(servingEnvRepo, isvcRepo)
+	isvcSvc := services.NewInferenceServiceService(isvcRepo, servingEnvRepo, modelRepo, versionRepo)
+	serveModelSvc := services.NewServeModelService(serveModelRepo, isvcRepo, versionRepo)
+	deploySvc := services.NewDeployService(servingEnvRepo, isvcRepo, modelRepo, versionRepo, kserveClient)
+	trafficSvc := services.NewTrafficService(trafficConfigRepo, trafficVariantRepo, isvcRepo, versionRepo, servingEnvRepo, kserveClient, aiGatewayClient)
+	virtualModelSvc := services.NewVirtualModelService(virtualModelRepo, aiGatewayClient)
+	metricsSvc := services.NewMetricsService(prometheusClient, isvcRepo)
+
+	// Primary Adapter (HTTP Handlers)
+	h := handlers.New(modelSvc, versionSvc, artifactSvc, servingEnvSvc, isvcSvc, serveModelSvc, deploySvc, trafficSvc, virtualModelSvc, metricsSvc)
 
 	// Setup router
 	router := gin.New()
