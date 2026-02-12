@@ -15,6 +15,7 @@ type InferenceServiceService struct {
 	envRepo     output.ServingEnvironmentRepository
 	modelRepo   output.RegisteredModelRepository
 	versionRepo output.ModelVersionRepository
+	kserve      output.KServeClient
 }
 
 func NewInferenceServiceService(
@@ -22,12 +23,14 @@ func NewInferenceServiceService(
 	envRepo output.ServingEnvironmentRepository,
 	modelRepo output.RegisteredModelRepository,
 	versionRepo output.ModelVersionRepository,
+	kserve output.KServeClient,
 ) *InferenceServiceService {
 	return &InferenceServiceService{
 		repo:        repo,
 		envRepo:     envRepo,
 		modelRepo:   modelRepo,
 		versionRepo: versionRepo,
+		kserve:      kserve,
 	}
 }
 
@@ -141,6 +144,15 @@ func (s *InferenceServiceService) Delete(ctx context.Context, projectID, id uuid
 	// Optionally check if currently deployed - prevent deletion
 	if isvc.CurrentState == domain.ISStateDeployed {
 		return domain.ErrCannotDeleteDeployed
+	}
+
+	// Cleanup KServe resource if exists
+	if isvc.Name != "" && s.kserve != nil && s.kserve.IsAvailable() {
+		env, err := s.envRepo.GetByID(ctx, projectID, isvc.ServingEnvironmentID)
+		if err == nil {
+			// Best effort cleanup - ignore errors (resource might already be deleted)
+			_ = s.kserve.Undeploy(ctx, env.Name, isvc.Name)
+		}
 	}
 
 	return s.repo.Delete(ctx, projectID, id)

@@ -108,7 +108,7 @@ func main() {
 	versionSvc := services.NewModelVersionService(versionRepo, modelRepo)
 	artifactSvc := services.NewModelArtifactService(versionRepo, modelRepo)
 	servingEnvSvc := services.NewServingEnvironmentService(servingEnvRepo, isvcRepo)
-	isvcSvc := services.NewInferenceServiceService(isvcRepo, servingEnvRepo, modelRepo, versionRepo)
+	isvcSvc := services.NewInferenceServiceService(isvcRepo, servingEnvRepo, modelRepo, versionRepo, kserveClient)
 	serveModelSvc := services.NewServeModelService(serveModelRepo, isvcRepo, versionRepo)
 	deploySvc := services.NewDeployService(servingEnvRepo, isvcRepo, serveModelRepo, modelRepo, versionRepo, kserveClient)
 	trafficSvc := services.NewTrafficService(trafficConfigRepo, trafficVariantRepo, isvcRepo, versionRepo, servingEnvRepo, kserveClient, aiGatewayClient)

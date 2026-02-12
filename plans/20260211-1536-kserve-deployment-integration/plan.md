@@ -1287,3 +1287,47 @@ func startServer(router *gin.Engine, cfg *config.Config) {
 
 4. ~~Change the API?~~
    → **No** - All 19 existing routes preserved, only internal restructure + new serving routes
+
+---
+
+## Bug Fixes
+
+### 2026-02-12: Delete InferenceService not cleaning up KServe resources
+
+**Issue**: `DELETE /inference_services/:id` only deleted DB record, leaving orphaned KServe InferenceService CR in Kubernetes.
+
+**Root Cause**: `InferenceServiceService.Delete()` method didn't have access to KServe client.
+
+**Fix**:
+1. Added `kserve output.KServeClient` to `InferenceServiceService` struct
+2. Updated constructor to accept kserve client
+3. Modified `Delete()` to call `kserve.Undeploy()` before DB deletion
+4. Updated `main.go` wiring to pass kserve client
+
+**Files Changed**:
+- `internal/core/services/inference-service.go`
+- `cmd/server/main.go`
+
+**Code Change**:
+```go
+func (s *InferenceServiceService) Delete(ctx context.Context, projectID, id uuid.UUID) error {
+    isvc, err := s.repo.GetByID(ctx, projectID, id)
+    if err != nil {
+        return err
+    }
+
+    if isvc.CurrentState == domain.ISStateDeployed {
+        return domain.ErrCannotDeleteDeployed
+    }
+
+    // NEW: Cleanup KServe resource if exists
+    if isvc.Name != "" && s.kserve != nil && s.kserve.IsAvailable() {
+        env, err := s.envRepo.GetByID(ctx, projectID, isvc.ServingEnvironmentID)
+        if err == nil {
+            _ = s.kserve.Undeploy(ctx, env.Name, isvc.Name)
+        }
+    }
+
+    return s.repo.Delete(ctx, projectID, id)
+}
+```
