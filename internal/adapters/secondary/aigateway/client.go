@@ -287,6 +287,25 @@ func (c *aiGatewayClient) GetServiceBackend(ctx context.Context, namespace, name
 	return c.parseAIServiceBackend(obj), nil
 }
 
+func (c *aiGatewayClient) ListServiceBackends(ctx context.Context, namespace string) ([]*output.AIServiceBackend, error) {
+	if namespace == "" {
+		namespace = c.defaultNS
+	}
+
+	list, err := c.client.Resource(aiServiceBackendGVR).
+		Namespace(namespace).
+		List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list aiservicebackends: %w", err)
+	}
+
+	var backends []*output.AIServiceBackend
+	for _, item := range list.Items {
+		backends = append(backends, c.parseAIServiceBackend(&item))
+	}
+	return backends, nil
+}
+
 // ============================================================================
 // Rate Limiting
 // ============================================================================
@@ -467,6 +486,27 @@ func (c *aiGatewayClient) buildAIServiceBackendCR(backend *output.AIServiceBacke
 		spec["backendRef"] = backendRef
 	}
 
+	// Add headerMutation if specified
+	if backend.HeaderMutation != nil {
+		headerMutation := map[string]interface{}{}
+		if len(backend.HeaderMutation.Set) > 0 {
+			setHeaders := make([]interface{}, 0, len(backend.HeaderMutation.Set))
+			for _, h := range backend.HeaderMutation.Set {
+				setHeaders = append(setHeaders, map[string]interface{}{
+					"name":  h.Name,
+					"value": h.Value,
+				})
+			}
+			headerMutation["set"] = setHeaders
+		}
+		if len(backend.HeaderMutation.Remove) > 0 {
+			headerMutation["remove"] = backend.HeaderMutation.Remove
+		}
+		if len(headerMutation) > 0 {
+			spec["headerMutation"] = headerMutation
+		}
+	}
+
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "aigateway.envoyproxy.io/v1alpha1",
@@ -627,6 +667,38 @@ func (c *aiGatewayClient) parseAIServiceBackend(obj *unstructured.Unstructured) 
 		}
 		if kind, ok := backendRefMap["kind"].(string); ok {
 			backend.BackendRef.Kind = kind
+		}
+	}
+
+	// Parse headerMutation
+	_, found, _ = unstructured.NestedMap(obj.Object, "spec", "headerMutation")
+	if found {
+		backend.HeaderMutation = &output.HeaderMutation{}
+
+		// Parse set headers
+		setHeaders, _, _ := unstructured.NestedSlice(obj.Object, "spec", "headerMutation", "set")
+		for _, h := range setHeaders {
+			hMap, ok := h.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			header := output.HTTPHeader{}
+			if name, ok := hMap["name"].(string); ok {
+				header.Name = name
+			}
+			if value, ok := hMap["value"].(string); ok {
+				header.Value = value
+			}
+			backend.HeaderMutation.Set = append(backend.HeaderMutation.Set, header)
+		}
+
+		// Parse remove headers
+		removeHeaders, _, _ := unstructured.NestedStringSlice(obj.Object, "spec", "headerMutation", "remove")
+		backend.HeaderMutation.Remove = removeHeaders
+
+		// Clear if empty
+		if len(backend.HeaderMutation.Set) == 0 && len(backend.HeaderMutation.Remove) == 0 {
+			backend.HeaderMutation = nil
 		}
 	}
 

@@ -49,11 +49,24 @@ type AIGatewayRouteStatus struct {
 
 // AIServiceBackend represents an AI Gateway backend configuration
 type AIServiceBackend struct {
-	Name       string            // Backend CR name
-	Namespace  string            // K8s namespace
-	Schema     string            // API schema: OpenAI, Anthropic, AWSBedrock, etc.
-	BackendRef BackendRef        // Reference to Envoy Gateway Backend
-	Labels     map[string]string // K8s labels
+	Name           string            // Backend CR name
+	Namespace      string            // K8s namespace
+	Schema         string            // API schema: OpenAI, Anthropic, AWSBedrock, etc.
+	BackendRef     BackendRef        // Reference to Envoy Gateway Backend
+	HeaderMutation *HeaderMutation   // Optional header mutation for API key injection
+	Labels         map[string]string // K8s labels
+}
+
+// HeaderMutation configures header transformations for upstream requests
+type HeaderMutation struct {
+	Set    []HTTPHeader // Headers to set
+	Remove []string     // Headers to remove
+}
+
+// HTTPHeader represents a single HTTP header
+type HTTPHeader struct {
+	Name  string
+	Value string
 }
 
 // BackendRef references an Envoy Gateway Backend resource
@@ -94,6 +107,7 @@ type AIGatewayClient interface {
 	UpdateServiceBackend(ctx context.Context, backend *AIServiceBackend) error
 	DeleteServiceBackend(ctx context.Context, namespace, name string) error
 	GetServiceBackend(ctx context.Context, namespace, name string) (*AIServiceBackend, error)
+	ListServiceBackends(ctx context.Context, namespace string) ([]*AIServiceBackend, error)
 
 	// Traffic policy operations
 	UpdateTrafficWeights(ctx context.Context, namespace, routeName string, backends []WeightedBackend) error

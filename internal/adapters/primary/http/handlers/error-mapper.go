@@ -59,8 +59,13 @@ func mapDomainError(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrCannotDeleteStable),
 		errors.Is(err, domain.ErrInvalidVirtualModelName),
 		errors.Is(err, domain.ErrInvalidBackendName),
-		errors.Is(err, domain.ErrInvalidPriority):
+		errors.Is(err, domain.ErrInvalidPriority),
+		errors.Is(err, domain.ErrInvalidSchema):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+	// Service unavailable errors
+	case errors.Is(err, domain.ErrAIGatewayNotAvailable):
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
 
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})

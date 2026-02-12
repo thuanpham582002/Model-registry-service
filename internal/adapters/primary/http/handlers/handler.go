@@ -17,6 +17,7 @@ type Handler struct {
 	trafficSvc      *services.TrafficService
 	virtualModelSvc *services.VirtualModelService
 	metricsSvc      *services.MetricsService
+	aiBackendSvc    *services.AIServiceBackendService
 }
 
 func New(
@@ -30,6 +31,7 @@ func New(
 	trafficSvc *services.TrafficService,
 	virtualModelSvc *services.VirtualModelService,
 	metricsSvc *services.MetricsService,
+	aiBackendSvc *services.AIServiceBackendService,
 ) *Handler {
 	return &Handler{
 		modelSvc:        modelSvc,
@@ -42,6 +44,7 @@ func New(
 		trafficSvc:      trafficSvc,
 		virtualModelSvc: virtualModelSvc,
 		metricsSvc:      metricsSvc,
+		aiBackendSvc:    aiBackendSvc,
 	}
 }
 
@@ -139,4 +142,11 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/metrics/deployments/:isvc_name", h.GetDeploymentMetrics)
 	r.GET("/metrics/compare/:isvc_name", h.CompareVariants)
 	r.GET("/metrics/tokens", h.GetTokenUsageMetrics)
+
+	// AI Service Backends (cluster-scoped, no Project-ID required)
+	r.GET("/ai_service_backends", h.ListAIServiceBackends)
+	r.GET("/ai_service_backends/:name", h.GetAIServiceBackend)
+	r.POST("/ai_service_backends", h.CreateAIServiceBackend)
+	r.PATCH("/ai_service_backends/:name", h.UpdateAIServiceBackend)
+	r.DELETE("/ai_service_backends/:name", h.DeleteAIServiceBackend)
 }

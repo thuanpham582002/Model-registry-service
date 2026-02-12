@@ -114,9 +114,10 @@ func main() {
 	trafficSvc := services.NewTrafficService(trafficConfigRepo, trafficVariantRepo, isvcRepo, versionRepo, servingEnvRepo, kserveClient, aiGatewayClient)
 	virtualModelSvc := services.NewVirtualModelService(virtualModelRepo, aiGatewayClient)
 	metricsSvc := services.NewMetricsService(prometheusClient, isvcRepo)
+	aiBackendSvc := services.NewAIServiceBackendService(aiGatewayClient)
 
 	// Primary Adapter (HTTP Handlers)
-	h := handlers.New(modelSvc, versionSvc, artifactSvc, servingEnvSvc, isvcSvc, serveModelSvc, deploySvc, trafficSvc, virtualModelSvc, metricsSvc)
+	h := handlers.New(modelSvc, versionSvc, artifactSvc, servingEnvSvc, isvcSvc, serveModelSvc, deploySvc, trafficSvc, virtualModelSvc, metricsSvc, aiBackendSvc)
 
 	// Setup router
 	router := gin.New()

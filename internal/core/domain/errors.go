@@ -117,3 +117,12 @@ var (
 	ErrInvalidTimeRange      = errors.New("invalid time range")
 	ErrPrometheusQueryFailed = errors.New("prometheus query failed")
 )
+
+// ============================================================================
+// AI Gateway Errors
+// ============================================================================
+
+var (
+	ErrAIGatewayNotAvailable = errors.New("AI Gateway integration not available")
+	ErrInvalidSchema         = errors.New("invalid API schema")
+)
