@@ -37,6 +37,13 @@ var (
 		Version:  "v1alpha1",
 		Resource: "backendtrafficpolicies",
 	}
+
+	// Envoy Gateway Backend CRD
+	backendGVR = schema.GroupVersionResource{
+		Group:    "gateway.envoyproxy.io",
+		Version:  "v1alpha1",
+		Resource: "backends",
+	}
 )
 
 type aiGatewayClient struct {
@@ -355,6 +362,103 @@ func (c *aiGatewayClient) UpdateRateLimitPolicy(ctx context.Context, namespace s
 }
 
 // ============================================================================
+// Envoy Gateway Backend Management
+// ============================================================================
+
+func (c *aiGatewayClient) CreateBackend(ctx context.Context, backend *output.Backend) error {
+	namespace := backend.Namespace
+	if namespace == "" {
+		namespace = c.defaultNS
+	}
+
+	obj := c.buildBackendCR(backend)
+
+	_, err := c.client.Resource(backendGVR).
+		Namespace(namespace).
+		Create(ctx, obj, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("create backend: %w", err)
+	}
+
+	return nil
+}
+
+func (c *aiGatewayClient) GetBackend(ctx context.Context, namespace, name string) (*output.Backend, error) {
+	if namespace == "" {
+		namespace = c.defaultNS
+	}
+
+	obj, err := c.client.Resource(backendGVR).
+		Namespace(namespace).
+		Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get backend: %w", err)
+	}
+
+	return c.parseBackend(obj), nil
+}
+
+func (c *aiGatewayClient) ListBackends(ctx context.Context, namespace string) ([]*output.Backend, error) {
+	if namespace == "" {
+		namespace = c.defaultNS
+	}
+
+	list, err := c.client.Resource(backendGVR).
+		Namespace(namespace).
+		List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list backends: %w", err)
+	}
+
+	var backends []*output.Backend
+	for _, item := range list.Items {
+		backends = append(backends, c.parseBackend(&item))
+	}
+	return backends, nil
+}
+
+func (c *aiGatewayClient) UpdateBackend(ctx context.Context, backend *output.Backend) error {
+	namespace := backend.Namespace
+	if namespace == "" {
+		namespace = c.defaultNS
+	}
+
+	existing, err := c.client.Resource(backendGVR).
+		Namespace(namespace).
+		Get(ctx, backend.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("get backend: %w", err)
+	}
+
+	obj := c.buildBackendCR(backend)
+	obj.SetResourceVersion(existing.GetResourceVersion())
+
+	_, err = c.client.Resource(backendGVR).
+		Namespace(namespace).
+		Update(ctx, obj, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update backend: %w", err)
+	}
+
+	return nil
+}
+
+func (c *aiGatewayClient) DeleteBackend(ctx context.Context, namespace, name string) error {
+	if namespace == "" {
+		namespace = c.defaultNS
+	}
+
+	err := c.client.Resource(backendGVR).
+		Namespace(namespace).
+		Delete(ctx, name, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("delete backend: %w", err)
+	}
+
+	return nil
+}
+
+// ============================================================================
 // CR Builders
 // ============================================================================
 
@@ -516,6 +620,57 @@ func (c *aiGatewayClient) buildAIServiceBackendCR(backend *output.AIServiceBacke
 				"labels": labelsInterface,
 			},
 			"spec": spec,
+		},
+	}
+}
+
+func (c *aiGatewayClient) buildBackendCR(backend *output.Backend) *unstructured.Unstructured {
+	labels := backend.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels["managed-by"] = "model-registry"
+
+	labelsInterface := make(map[string]interface{})
+	for k, v := range labels {
+		labelsInterface[k] = v
+	}
+
+	// Build endpoints
+	endpoints := make([]interface{}, 0, len(backend.Endpoints))
+	for _, ep := range backend.Endpoints {
+		var endpoint map[string]interface{}
+		if ep.FQDN != nil {
+			endpoint = map[string]interface{}{
+				"fqdn": map[string]interface{}{
+					"hostname": ep.FQDN.Hostname,
+					"port":     int64(ep.FQDN.Port),
+				},
+			}
+		} else if ep.IP != nil {
+			endpoint = map[string]interface{}{
+				"ip": map[string]interface{}{
+					"address": ep.IP.Address,
+					"port":    int64(ep.IP.Port),
+				},
+			}
+		}
+		if endpoint != nil {
+			endpoints = append(endpoints, endpoint)
+		}
+	}
+
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "gateway.envoyproxy.io/v1alpha1",
+			"kind":       "Backend",
+			"metadata": map[string]interface{}{
+				"name":   backend.Name,
+				"labels": labelsInterface,
+			},
+			"spec": map[string]interface{}{
+				"endpoints": endpoints,
+			},
 		},
 	}
 }
@@ -728,6 +883,51 @@ func (c *aiGatewayClient) parseRouteStatus(obj *unstructured.Unstructured) *outp
 	}
 
 	return status
+}
+
+func (c *aiGatewayClient) parseBackend(obj *unstructured.Unstructured) *output.Backend {
+	backend := &output.Backend{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+		Labels:    obj.GetLabels(),
+	}
+
+	endpoints, found, _ := unstructured.NestedSlice(obj.Object, "spec", "endpoints")
+	if found {
+		for _, ep := range endpoints {
+			epMap, ok := ep.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			be := output.BackendEndpoint{}
+
+			// Parse FQDN endpoint
+			if fqdn, ok := epMap["fqdn"].(map[string]interface{}); ok {
+				be.FQDN = &output.FQDNEndpoint{}
+				if hostname, ok := fqdn["hostname"].(string); ok {
+					be.FQDN.Hostname = hostname
+				}
+				if port, ok := fqdn["port"].(int64); ok {
+					be.FQDN.Port = int32(port)
+				}
+			}
+
+			// Parse IP endpoint
+			if ip, ok := epMap["ip"].(map[string]interface{}); ok {
+				be.IP = &output.IPEndpoint{}
+				if addr, ok := ip["address"].(string); ok {
+					be.IP.Address = addr
+				}
+				if port, ok := ip["port"].(int64); ok {
+					be.IP.Port = int32(port)
+				}
+			}
+
+			backend.Endpoints = append(backend.Endpoints, be)
+		}
+	}
+
+	return backend
 }
 
 // Ensure interface compliance

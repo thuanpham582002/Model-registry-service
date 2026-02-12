@@ -21,7 +21,8 @@ func mapDomainError(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrTrafficConfigNotFound),
 		errors.Is(err, domain.ErrTrafficVariantNotFound),
 		errors.Is(err, domain.ErrVirtualModelNotFound),
-		errors.Is(err, domain.ErrBackendNotFound):
+		errors.Is(err, domain.ErrBackendNotFound),
+		errors.Is(err, domain.ErrEnvoyBackendNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 
 	// Conflict errors
@@ -32,7 +33,8 @@ func mapDomainError(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrVariantAlreadyExists),
 		errors.Is(err, domain.ErrCanaryAlreadyExists),
 		errors.Is(err, domain.ErrVirtualModelExists),
-		errors.Is(err, domain.ErrBackendAlreadyExists):
+		errors.Is(err, domain.ErrBackendAlreadyExists),
+		errors.Is(err, domain.ErrEnvoyBackendAlreadyExists):
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 
 	// Bad request / validation errors

@@ -18,6 +18,7 @@ type Handler struct {
 	virtualModelSvc *services.VirtualModelService
 	metricsSvc      *services.MetricsService
 	aiBackendSvc    *services.AIServiceBackendService
+	backendSvc      *services.BackendService
 }
 
 func New(
@@ -32,6 +33,7 @@ func New(
 	virtualModelSvc *services.VirtualModelService,
 	metricsSvc *services.MetricsService,
 	aiBackendSvc *services.AIServiceBackendService,
+	backendSvc *services.BackendService,
 ) *Handler {
 	return &Handler{
 		modelSvc:        modelSvc,
@@ -45,6 +47,7 @@ func New(
 		virtualModelSvc: virtualModelSvc,
 		metricsSvc:      metricsSvc,
 		aiBackendSvc:    aiBackendSvc,
+		backendSvc:      backendSvc,
 	}
 }
 
@@ -149,4 +152,11 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/ai_service_backends", h.CreateAIServiceBackend)
 	r.PATCH("/ai_service_backends/:name", h.UpdateAIServiceBackend)
 	r.DELETE("/ai_service_backends/:name", h.DeleteAIServiceBackend)
+
+	// Envoy Gateway Backends (cluster-scoped, no Project-ID required)
+	r.GET("/backends", h.ListBackends)
+	r.GET("/backends/:name", h.GetBackend)
+	r.POST("/backends", h.CreateBackend)
+	r.PATCH("/backends/:name", h.UpdateBackend)
+	r.DELETE("/backends/:name", h.DeleteBackend)
 }

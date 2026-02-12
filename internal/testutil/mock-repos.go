@@ -195,3 +195,36 @@ func (m *MockAIGatewayClient) IsAvailable() bool {
 	args := m.Called()
 	return args.Bool(0)
 }
+
+// Backend CRUD methods
+
+func (m *MockAIGatewayClient) CreateBackend(ctx context.Context, backend *output.Backend) error {
+	args := m.Called(ctx, backend)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) UpdateBackend(ctx context.Context, backend *output.Backend) error {
+	args := m.Called(ctx, backend)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) DeleteBackend(ctx context.Context, namespace, name string) error {
+	args := m.Called(ctx, namespace, name)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) GetBackend(ctx context.Context, namespace, name string) (*output.Backend, error) {
+	args := m.Called(ctx, namespace, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*output.Backend), args.Error(1)
+}
+
+func (m *MockAIGatewayClient) ListBackends(ctx context.Context, namespace string) ([]*output.Backend, error) {
+	args := m.Called(ctx, namespace)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*output.Backend), args.Error(1)
+}

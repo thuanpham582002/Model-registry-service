@@ -78,6 +78,36 @@ type BackendRef struct {
 }
 
 // ============================================================================
+// Envoy Gateway Backend Types
+// ============================================================================
+
+// Backend represents an Envoy Gateway Backend resource
+type Backend struct {
+	Name      string            // Backend CR name
+	Namespace string            // K8s namespace
+	Endpoints []BackendEndpoint // Backend endpoints
+	Labels    map[string]string // K8s labels
+}
+
+// BackendEndpoint represents a single endpoint (FQDN or IP)
+type BackendEndpoint struct {
+	FQDN *FQDNEndpoint // FQDN endpoint
+	IP   *IPEndpoint   // IP endpoint
+}
+
+// FQDNEndpoint represents an FQDN-based endpoint
+type FQDNEndpoint struct {
+	Hostname string
+	Port     int32
+}
+
+// IPEndpoint represents an IP-based endpoint
+type IPEndpoint struct {
+	Address string
+	Port    int32
+}
+
+// ============================================================================
 // Rate Limiting Types
 // ============================================================================
 
@@ -115,6 +145,13 @@ type AIGatewayClient interface {
 	// Rate limiting (BackendTrafficPolicy from Envoy Gateway)
 	CreateRateLimitPolicy(ctx context.Context, namespace string, config *RateLimitConfig) error
 	UpdateRateLimitPolicy(ctx context.Context, namespace string, config *RateLimitConfig) error
+
+	// Envoy Gateway Backend management (Backend CRD)
+	CreateBackend(ctx context.Context, backend *Backend) error
+	UpdateBackend(ctx context.Context, backend *Backend) error
+	DeleteBackend(ctx context.Context, namespace, name string) error
+	GetBackend(ctx context.Context, namespace, name string) (*Backend, error)
+	ListBackends(ctx context.Context, namespace string) ([]*Backend, error)
 
 	// Availability check
 	IsAvailable() bool

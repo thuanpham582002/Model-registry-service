@@ -126,3 +126,12 @@ var (
 	ErrAIGatewayNotAvailable = errors.New("AI Gateway integration not available")
 	ErrInvalidSchema         = errors.New("invalid API schema")
 )
+
+// ============================================================================
+// Envoy Gateway Backend Errors
+// ============================================================================
+
+var (
+	ErrEnvoyBackendNotFound      = errors.New("envoy gateway backend not found")
+	ErrEnvoyBackendAlreadyExists = errors.New("envoy gateway backend already exists")
+)
