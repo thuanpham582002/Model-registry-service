@@ -332,6 +332,171 @@ curl -s -X POST "$BASE_URL/ai_service_backends" \
 # Expected: {"error": "invalid schema: must be one of OpenAI, Anthropic, VertexAI, etc."}
 ```
 
+## Multi-Model Traffic Split Test
+
+Complex scenario with **4 backends** and **3 virtual models**.
+
+### Setup: Create 4 AIServiceBackends
+
+```bash
+# Backend 1: OpenAI
+curl -s -X POST "$BASE_URL/ai_service_backends" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"openai-gpt4","schema":"OpenAI","backend_ref":{"name":"openai-svc"}}'
+
+# Backend 2: Anthropic
+curl -s -X POST "$BASE_URL/ai_service_backends" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"anthropic-claude","schema":"Anthropic","backend_ref":{"name":"anthropic-svc"}}'
+
+# Backend 3: Gemini (using OpenAI-compatible schema)
+curl -s -X POST "$BASE_URL/ai_service_backends" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"gemini-pro","schema":"OpenAI","backend_ref":{"name":"google-svc"}}'
+
+# Backend 4: Azure OpenAI
+curl -s -X POST "$BASE_URL/ai_service_backends" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"azure-openai","schema":"AzureOpenAI","backend_ref":{"name":"azure-svc"}}'
+```
+
+### Create 3 Virtual Models
+
+```bash
+PROJECT_ID="11111111-1111-1111-1111-111111111111"
+
+# Model 1: Chat (2 backends)
+curl -s -X POST "$BASE_URL/virtual_models" \
+  -H "Content-Type: application/json" \
+  -H "Project-ID: $PROJECT_ID" \
+  -d '{"name":"chat-model","description":"Chat completion model"}'
+
+# Model 2: Code (2 backends)
+curl -s -X POST "$BASE_URL/virtual_models" \
+  -H "Content-Type: application/json" \
+  -H "Project-ID: $PROJECT_ID" \
+  -d '{"name":"code-model","description":"Code generation model"}'
+
+# Model 3: Enterprise (4 backends)
+curl -s -X POST "$BASE_URL/virtual_models" \
+  -H "Content-Type: application/json" \
+  -H "Project-ID: $PROJECT_ID" \
+  -d '{"name":"enterprise-model","description":"Enterprise with 4 backends"}'
+```
+
+### Configure Traffic Split
+
+```bash
+# chat-model: 80% OpenAI, 20% Anthropic
+curl -s -X POST "$BASE_URL/virtual_models/chat-model/backends" \
+  -H "Content-Type: application/json" -H "Project-ID: $PROJECT_ID" \
+  -d '{"ai_service_backend_name":"openai-gpt4","ai_service_backend_namespace":"model-serving","weight":80,"priority":0}'
+
+curl -s -X POST "$BASE_URL/virtual_models/chat-model/backends" \
+  -H "Content-Type: application/json" -H "Project-ID: $PROJECT_ID" \
+  -d '{"ai_service_backend_name":"anthropic-claude","ai_service_backend_namespace":"model-serving","weight":20,"priority":1}'
+
+# code-model: 70% Anthropic, 30% OpenAI
+curl -s -X POST "$BASE_URL/virtual_models/code-model/backends" \
+  -H "Content-Type: application/json" -H "Project-ID: $PROJECT_ID" \
+  -d '{"ai_service_backend_name":"anthropic-claude","ai_service_backend_namespace":"model-serving","weight":70,"priority":0}'
+
+curl -s -X POST "$BASE_URL/virtual_models/code-model/backends" \
+  -H "Content-Type: application/json" -H "Project-ID: $PROJECT_ID" \
+  -d '{"ai_service_backend_name":"openai-gpt4","ai_service_backend_namespace":"model-serving","weight":30,"priority":1}'
+
+# enterprise-model: 40% OpenAI, 30% Anthropic, 20% Gemini, 10% Azure
+curl -s -X POST "$BASE_URL/virtual_models/enterprise-model/backends" \
+  -H "Content-Type: application/json" -H "Project-ID: $PROJECT_ID" \
+  -d '{"ai_service_backend_name":"openai-gpt4","ai_service_backend_namespace":"model-serving","weight":40,"priority":0}'
+
+curl -s -X POST "$BASE_URL/virtual_models/enterprise-model/backends" \
+  -H "Content-Type: application/json" -H "Project-ID: $PROJECT_ID" \
+  -d '{"ai_service_backend_name":"anthropic-claude","ai_service_backend_namespace":"model-serving","weight":30,"priority":0}'
+
+curl -s -X POST "$BASE_URL/virtual_models/enterprise-model/backends" \
+  -H "Content-Type: application/json" -H "Project-ID: $PROJECT_ID" \
+  -d '{"ai_service_backend_name":"gemini-pro","ai_service_backend_namespace":"model-serving","weight":20,"priority":1}'
+
+curl -s -X POST "$BASE_URL/virtual_models/enterprise-model/backends" \
+  -H "Content-Type: application/json" -H "Project-ID: $PROJECT_ID" \
+  -d '{"ai_service_backend_name":"azure-openai","ai_service_backend_namespace":"model-serving","weight":10,"priority":2}'
+```
+
+### Verify in Kubernetes
+
+```bash
+# List all backends
+kubectl get aiservicebackends -n model-serving
+
+# List all routes
+kubectl get aigatewayroutes -n model-serving
+
+# Check traffic split for each model
+kubectl get aigatewayroute <route-name> -n model-serving -o jsonpath='{.spec.rules[0].backendRefs}'
+```
+
+### Expected Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    4 AIServiceBackends                          │
+├─────────────────┬─────────────────┬───────────────┬─────────────┤
+│  openai-gpt4    │ anthropic-claude│  gemini-pro   │ azure-openai│
+│  (OpenAI)       │ (Anthropic)     │  (OpenAI)     │ (AzureOpenAI)│
+└────────┬────────┴────────┬────────┴───────┬───────┴──────┬──────┘
+         │                 │                │              │
+         ▼                 ▼                ▼              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    3 Virtual Models                             │
+├─────────────────────────────────────────────────────────────────┤
+│  chat-model          │  code-model         │  enterprise-model  │
+│  ├─ openai: 80%      │  ├─ anthropic: 70%  │  ├─ openai: 40%    │
+│  └─ anthropic: 20%   │  └─ openai: 30%     │  ├─ anthropic: 30% │
+│                      │                     │  ├─ gemini: 20%    │
+│                      │                     │  └─ azure: 10%     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Traffic Split Summary
+
+| Model | Backends | Weights | Priority |
+|-------|----------|---------|----------|
+| chat-model | openai-gpt4, anthropic-claude | 80/20 | 0, 1 |
+| code-model | anthropic-claude, openai-gpt4 | 70/30 | 0, 1 |
+| enterprise-model | openai, anthropic, gemini, azure | 40/30/20/10 | 0, 0, 1, 2 |
+
+### Backend Validation Test
+
+```bash
+# This should FAIL - backend doesn't exist
+curl -s -X POST "$BASE_URL/virtual_models/chat-model/backends" \
+  -H "Content-Type: application/json" -H "Project-ID: $PROJECT_ID" \
+  -d '{"ai_service_backend_name":"non-existent","ai_service_backend_namespace":"model-serving","weight":10}'
+
+# Expected: {"error":"backend model-serving/non-existent not found: backend not found"}
+```
+
+### Cleanup
+
+```bash
+# Delete virtual models (also removes AIGatewayRoutes)
+curl -s -X DELETE "$BASE_URL/virtual_models/chat-model" -H "Project-ID: $PROJECT_ID"
+curl -s -X DELETE "$BASE_URL/virtual_models/code-model" -H "Project-ID: $PROJECT_ID"
+curl -s -X DELETE "$BASE_URL/virtual_models/enterprise-model" -H "Project-ID: $PROJECT_ID"
+
+# Delete backends
+curl -s -X DELETE "$BASE_URL/ai_service_backends/openai-gpt4"
+curl -s -X DELETE "$BASE_URL/ai_service_backends/anthropic-claude"
+curl -s -X DELETE "$BASE_URL/ai_service_backends/gemini-pro"
+curl -s -X DELETE "$BASE_URL/ai_service_backends/azure-openai"
+
+# Verify cleanup
+kubectl get aiservicebackends,aigatewayroutes -n model-serving
+```
+
+---
+
 ## Notes
 
 - Default namespace is `model-serving` if not specified in request
@@ -339,3 +504,4 @@ curl -s -X POST "$BASE_URL/ai_service_backends" \
 - Labels are stored as K8s metadata labels
 - HeaderMutation applies to AI Gateway routing
 - K8s verification confirms bidirectional sync between API and CRDs
+- Backend validation ensures AIServiceBackend exists before linking to VirtualModel
