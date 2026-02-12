@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"model-registry-service/internal/core/domain"
-	"model-registry-service/internal/core/ports/output"
+	output "model-registry-service/internal/core/ports/output"
 )
 
 // MockRegisteredModelRepo is a mock of RegisteredModelRepository.
@@ -46,7 +46,7 @@ func (m *MockRegisteredModelRepo) Delete(ctx context.Context, projectID uuid.UUI
 	return args.Error(0)
 }
 
-func (m *MockRegisteredModelRepo) List(ctx context.Context, filter ports.ListFilter) ([]*domain.RegisteredModel, int, error) {
+func (m *MockRegisteredModelRepo) List(ctx context.Context, filter output.ListFilter) ([]*domain.RegisteredModel, int, error) {
 	args := m.Called(ctx, filter)
 	if args.Get(0) == nil {
 		return nil, args.Int(1), args.Error(2)
@@ -85,7 +85,7 @@ func (m *MockModelVersionRepo) Update(ctx context.Context, projectID uuid.UUID, 
 	return args.Error(0)
 }
 
-func (m *MockModelVersionRepo) List(ctx context.Context, filter ports.VersionListFilter) ([]*domain.ModelVersion, int, error) {
+func (m *MockModelVersionRepo) List(ctx context.Context, filter output.VersionListFilter) ([]*domain.ModelVersion, int, error) {
 	args := m.Called(ctx, filter)
 	if args.Get(0) == nil {
 		return nil, args.Int(1), args.Error(2)
@@ -93,7 +93,7 @@ func (m *MockModelVersionRepo) List(ctx context.Context, filter ports.VersionLis
 	return args.Get(0).([]*domain.ModelVersion), args.Int(1), args.Error(2)
 }
 
-func (m *MockModelVersionRepo) ListByModel(ctx context.Context, modelID uuid.UUID, filter ports.VersionListFilter) ([]*domain.ModelVersion, int, error) {
+func (m *MockModelVersionRepo) ListByModel(ctx context.Context, modelID uuid.UUID, filter output.VersionListFilter) ([]*domain.ModelVersion, int, error) {
 	args := m.Called(ctx, modelID, filter)
 	if args.Get(0) == nil {
 		return nil, args.Int(1), args.Error(2)
@@ -107,4 +107,91 @@ func (m *MockModelVersionRepo) FindByParams(ctx context.Context, projectID uuid.
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.ModelVersion), args.Error(1)
+}
+
+// MockAIGatewayClient is a mock of AIGatewayClient.
+type MockAIGatewayClient struct {
+	mock.Mock
+}
+
+func (m *MockAIGatewayClient) CreateRoute(ctx context.Context, route *output.AIGatewayRoute) error {
+	args := m.Called(ctx, route)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) UpdateRoute(ctx context.Context, route *output.AIGatewayRoute) error {
+	args := m.Called(ctx, route)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) DeleteRoute(ctx context.Context, namespace, name string) error {
+	args := m.Called(ctx, namespace, name)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) GetRoute(ctx context.Context, namespace, name string) (*output.AIGatewayRoute, error) {
+	args := m.Called(ctx, namespace, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*output.AIGatewayRoute), args.Error(1)
+}
+
+func (m *MockAIGatewayClient) GetRouteStatus(ctx context.Context, namespace, name string) (*output.AIGatewayRouteStatus, error) {
+	args := m.Called(ctx, namespace, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*output.AIGatewayRouteStatus), args.Error(1)
+}
+
+func (m *MockAIGatewayClient) CreateServiceBackend(ctx context.Context, backend *output.AIServiceBackend) error {
+	args := m.Called(ctx, backend)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) UpdateServiceBackend(ctx context.Context, backend *output.AIServiceBackend) error {
+	args := m.Called(ctx, backend)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) DeleteServiceBackend(ctx context.Context, namespace, name string) error {
+	args := m.Called(ctx, namespace, name)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) GetServiceBackend(ctx context.Context, namespace, name string) (*output.AIServiceBackend, error) {
+	args := m.Called(ctx, namespace, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*output.AIServiceBackend), args.Error(1)
+}
+
+func (m *MockAIGatewayClient) ListServiceBackends(ctx context.Context, namespace string) ([]*output.AIServiceBackend, error) {
+	args := m.Called(ctx, namespace)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*output.AIServiceBackend), args.Error(1)
+}
+
+func (m *MockAIGatewayClient) UpdateTrafficWeights(ctx context.Context, namespace, routeName string, backends []output.WeightedBackend) error {
+	args := m.Called(ctx, namespace, routeName, backends)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) CreateRateLimitPolicy(ctx context.Context, namespace string, config *output.RateLimitConfig) error {
+	args := m.Called(ctx, namespace, config)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) UpdateRateLimitPolicy(ctx context.Context, namespace string, config *output.RateLimitConfig) error {
+	args := m.Called(ctx, namespace, config)
+	return args.Error(0)
+}
+
+func (m *MockAIGatewayClient) IsAvailable() bool {
+	args := m.Called()
+	return args.Bool(0)
 }
