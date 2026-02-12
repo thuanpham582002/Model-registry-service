@@ -35,8 +35,8 @@ func (r *virtualModelRepo) Create(ctx context.Context, vm *domain.VirtualModel) 
 		vm.ID,
 		vm.ProjectID,
 		vm.Name,
-		nullableString(vm.Description),
-		nullableString(vm.AIGatewayRouteName),
+		vm.Description,        // NOT NULL column with default
+		vm.AIGatewayRouteName, // NOT NULL column with default
 		vm.Status,
 		vm.CreatedAt,
 		vm.UpdatedAt,
@@ -103,8 +103,8 @@ func (r *virtualModelRepo) Update(ctx context.Context, projectID uuid.UUID, vm *
 	`
 	result, err := r.pool.Exec(ctx, query,
 		vm.Name,
-		nullableString(vm.Description),
-		nullableString(vm.AIGatewayRouteName),
+		vm.Description,        // NOT NULL column
+		vm.AIGatewayRouteName, // NOT NULL column
 		vm.Status,
 		vm.ID,
 		projectID,
