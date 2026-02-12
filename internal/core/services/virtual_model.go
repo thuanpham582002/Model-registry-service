@@ -135,12 +135,14 @@ func (s *VirtualModelService) AddBackend(ctx context.Context, req AddBackendRequ
 		}
 	}
 
+	// Default namespace if not provided
+	namespace := req.AIServiceBackendNS
+	if namespace == "" {
+		namespace = "model-serving"
+	}
+
 	// Validate AIServiceBackend exists in K8s
 	if s.aiGateway != nil && s.aiGateway.IsAvailable() {
-		namespace := req.AIServiceBackendNS
-		if namespace == "" {
-			namespace = "model-serving"
-		}
 		_, err := s.aiGateway.GetServiceBackend(ctx, namespace, req.AIServiceBackendName)
 		if err != nil {
 			return nil, fmt.Errorf("backend %s/%s not found: %w", namespace, req.AIServiceBackendName, domain.ErrBackendNotFound)
@@ -157,7 +159,7 @@ func (s *VirtualModelService) AddBackend(ctx context.Context, req AddBackendRequ
 	if err != nil {
 		return nil, err
 	}
-	backend.AIServiceBackendNamespace = req.AIServiceBackendNS
+	backend.AIServiceBackendNamespace = namespace
 
 	if err := s.vmRepo.CreateBackend(ctx, backend); err != nil {
 		return nil, err
