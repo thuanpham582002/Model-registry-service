@@ -43,6 +43,7 @@ var (
 	ErrInvalidModelID              = errors.New("registered model ID is required")
 	ErrInvalidVersionID            = errors.New("model version ID is required")
 	ErrInvalidState                = errors.New("invalid state")
+	ErrUnsupportedFramework        = errors.New("unsupported model framework. Supported: sklearn, xgboost, tensorflow, pytorch, onnx, triton, lightgbm, paddle, mlflow, huggingface, pmml")
 )
 
 // Business rule errors

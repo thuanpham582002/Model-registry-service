@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,32 @@ const (
 	ArtifactTypeDoc     ArtifactType = "doc-artifact"
 	ArtifactTypeDataset ArtifactType = "dataset-artifact"
 )
+
+// KServe supported model frameworks
+// See: https://kserve.github.io/website/docs/model-serving/predictive-inference/frameworks/overview
+var SupportedFrameworks = map[string]bool{
+	"sklearn":     true,
+	"xgboost":     true,
+	"tensorflow":  true,
+	"pytorch":     true,
+	"onnx":        true,
+	"triton":      true,
+	"lightgbm":    true,
+	"paddle":      true,
+	"mlflow":      true,
+	"huggingface": true,
+	"pmml":        true,
+}
+
+func ValidateModelFramework(framework string) error {
+	if framework == "" {
+		return nil
+	}
+	if !SupportedFrameworks[strings.ToLower(framework)] {
+		return ErrUnsupportedFramework
+	}
+	return nil
+}
 
 type ModelVersion struct {
 	ID                    uuid.UUID     `json:"id"`
